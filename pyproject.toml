@@ -1,0 +1,45 @@
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry]
+name = "easycarla"
+version = "0.1.0"
+description = "Machine Learning Data Generation with Carla"
+authors = ["Leunar Kalludra <leunarkalludra@gmail.com>"]
+license = "MIT"
+readme = "README.md"
+homepage = "https://your_project_homepage.com"
+repository = "https://github.com/your_github_username/your_project_name"
+documentation = "https://your_project_docs.com"
+keywords = ["Carla", "Dataset", "Generation"]
+packages = [{include = "easycarla", from="src"}]
+
+[tool.poetry.dependencies]
+python = "^3.10"
+carla = "*"
+pygame = "*"
+numpy = "*"
+networkx = "*"
+distro = "*"
+Shapely = "*"
+open3d = "*"
+matplotlib = "*"
+
+[tool.poetry.dev-dependencies]
+black = "^23.0"
+isort = "^5.0"
+mypy = "^0.910"
+
+[tool.poetry.scripts]
+easycarla = "easycarla.main:main"
+
+[tool.black]
+line-length = 160
+
+[tool.isort]
+profile = "black"
+
+[tool.mypy]
+python_version = "3.10"
+strict = true

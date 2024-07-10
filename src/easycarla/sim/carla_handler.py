@@ -7,7 +7,7 @@ from easycarla.sim.traffic_simulation import TrafficSimulation
 from easycarla.sim.process_data import process_data
 
 class CarlaHandler:
-    def __init__(self, host='127.0.0.1', port=2000, timeout=2.0, num_vehicles=30, num_walkers=10, fps=30):
+    def __init__(self, host='127.0.0.1', port=2000, timeout=2.0, num_vehicles=30, num_walkers=40, fps=30):
         self.client = carla.Client(host, port)
         self.client.set_timeout(timeout)
         self.world = self.client.get_world()
@@ -39,6 +39,8 @@ class CarlaHandler:
         self.executor.shutdown(wait=True)
 
     def tick(self, timeout=2.0):
-        snapshot, *sensors_data = self.sync_mode.tick(timeout=timeout)
-        self.executor.submit(process_data, snapshot, *sensors_data)
-        return snapshot, *sensors_data
+        # snapshots contains carla.WorldSnapShot and the registered sensors data carla.SensorData
+        snapshots = self.sync_mode.tick(timeout=timeout)
+        # Additionally, we add the world to be able to retrieve e.g. actor ids and run it parallel
+        self.executor.submit(process_data, self.world, *snapshots)
+        return self.world, *snapshots

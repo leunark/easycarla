@@ -30,14 +30,28 @@ def save_to_disk(lidar: carla.LidarMeasurement = None, image_rgb: carla.Image = 
     if image_depth is not None:
         image_depth_dir = output_dir / "image_depth"
         image_depth_dir.mkdir(parents=True, exist_ok=True)
-        image_depth.save_to_disk(str(image_depth_dir / f'{image_depth.frame}.png'), carla.ColorConverter.Depth)
+        image_depth.save_to_disk(str(image_depth_dir / f'{image_depth.frame}.png'), carla.ColorConverter.LogarithmicDepth)
     if image_insemseg is not None:
         image_insemseg_dir = output_dir / "image_insemseg"
         image_insemseg_dir.mkdir(parents=True, exist_ok=True)
         image_insemseg.save_to_disk(str(image_insemseg_dir / f'{image_insemseg.frame}.png'))
 
-def process_data(world_snapshot: carla.WorldSnapshot, lidar: carla.LidarMeasurement, image_rgb: carla.Image, image_depth: carla.Image, image_insemseg: carla.Image):
+def process_data(
+        world: carla.World,
+        world_snapshot: carla.WorldSnapshot, 
+        lidar: carla.LidarMeasurement, 
+        image_rgb: carla.Image, 
+        image_depth: carla.Image, 
+        image_insemseg: carla.Image):
 
+    output_dir: Path = Path("data")
+    if image_depth is not None:
+        image_depth_dir = output_dir / "image_depth"
+        image_depth_dir.mkdir(parents=True, exist_ok=True)
+        image_depth.save_to_disk(str(image_depth_dir / f'{image_depth.frame}.png'), carla.ColorConverter.LogarithmicDepth)
+
+
+"""
     # Get transformations
     lidar_transform = lidar.transform
     camera_transform = image_rgb.transform
@@ -54,3 +68,5 @@ def process_data(world_snapshot: carla.WorldSnapshot, lidar: carla.LidarMeasurem
 
     # Save to disk
     save_to_disk(lidar=lidar, image_rgb=image_rgb, image_depth=image_depth, image_insemseg=image_insemseg)
+
+"""

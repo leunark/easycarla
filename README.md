@@ -43,18 +43,13 @@ Ensure your system meets the following requirements:
         conda activate carla-env
         ```
 
-3. **Install requirements**:
+3. **Install this package**:
     - Install carla package:
         ```shell
-        pip install carla
-        ```
-    - Install other required dependencies:
-        ```shell
-        pip install -r requirements.txt
+        pip install -e .
         ```
 
 ## Usage
-
 1. **Run Carla Simulator**:
    - Open a Command Prompt.
    - Run `CarlaUE4.exe` to start the simulator:
@@ -66,7 +61,7 @@ Ensure your system meets the following requirements:
 2. **Start Client**:
     - Run `CarlaUE4.exe` with the `-RenderOffScreen` flag to start the simulator:
      ```shell
-     python ...py
+     python src/easycarla/main.py
      ```
 
 

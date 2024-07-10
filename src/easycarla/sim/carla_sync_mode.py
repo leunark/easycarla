@@ -4,6 +4,26 @@ import carla
 import numpy as np
 
 
+def get_vehicle_bounding_boxes(world: carla.World, world_snapshot: carla.WorldSnapshot):
+    # Get all actors from the world
+    actors = world.get_actors()
+
+    # Filter out the vehicles from all actors
+    vehicles = actors.filter('vehicle.*')
+
+    # Retrieve bounding boxes for all vehicles
+    vehicle_bounding_boxes = {}
+    for vehicle in vehicles:
+        vehicle_snapshot = world_snapshot.find(vehicle.id)
+        if vehicle_snapshot:
+            # Get the bounding box of the vehicle
+            bounding_box = vehicle.bounding_box
+            # Transform the bounding box to the vehicle's current transform
+            bounding_box.location = vehicle_snapshot.get_transform().transform(bounding_box.location)
+            vehicle_bounding_boxes[vehicle.id] = bounding_box
+
+    return vehicle_bounding_boxes
+
 class CarlaSyncMode:
     """
     Context manager to synchronize output from different sensors. Synchronous
@@ -30,6 +50,7 @@ class CarlaSyncMode:
             synchronous_mode=True,
             fixed_delta_seconds=self.delta_seconds))
 
+        # listen event will pass sensor data to q.put which adds it to its queue
         def make_queue(register_event):
             q = Queue()
             register_event(q.put)

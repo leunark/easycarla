@@ -1,6 +1,8 @@
 import pygame
 import carla
 import numpy as np
+from easycarla.sim.bounding_boxes import BoundingBoxes
+
 
 class PygameHandler:
     def __init__(self, width=800, height=600):
@@ -23,11 +25,12 @@ class PygameHandler:
         self.clock.tick()
         return True
 
-    def update_display(self, snapshot, lidar, image_rgb, image_depth, image_insemseg):
-        image_insemseg.convert(carla.ColorConverter.CityScapesPalette)
+    def update_display(self, world, snapshot, lidar, image_rgb, image_depth, image_insemseg):
+
+        # Visualize display stats
         fps_simulated = round(1.0 / snapshot.timestamp.delta_seconds)
         fps_real = self.clock.get_fps()
-    
+
         self.draw_image(self.display, image_rgb)
         self.draw_image(self.display, image_insemseg, blend=True)
         self.display.blit(
@@ -36,6 +39,14 @@ class PygameHandler:
         self.display.blit(
             self.font.render(f'{fps_simulated} FPS (simulated)', True, (255, 255, 255)),
             (8, 28))
+
+        # Visualize filtered bounding boxes
+        vehicles = [actor for actor in world.get_actors().filter('vehicle.*')]
+        bb_boxes = BoundingBoxes.get_camera_bounding_boxes(vehicles, image_rgb)
+        bb_boxes = BoundingBoxes.filter_occluded(bb_boxes, image_depth)
+        BoundingBoxes.draw_bounding_boxes(self.display, bb_boxes, image_depth)
+        print(f"Detected {len(bb_boxes)} bounding boxes of {len(vehicles)}")
+        
         pygame.display.flip()
 
     @staticmethod

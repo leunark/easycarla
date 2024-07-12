@@ -1,16 +1,105 @@
+import carla
+import pygame
+import logging
 from easycarla.visu.pygame_handler import PygameHandler
-from easycarla.sim.carla_handler import CarlaHandler
+from easycarla.sim.simulation_manager import SimulationManager
+from easycarla.sim.bounding_boxes import BoundingBoxes
+from easycarla.utils.carla_helper import extract_image_rgb
+from easycarla.sim.display_manager import DisplayManager
+from easycarla.sim.sensor_manager import SensorManager, SensorType, MountingPosition
+from easycarla.sim.spawn_manager import SpawnManager, SpawnManagerConfig
+
+logging.basicConfig(level=logging.INFO)
+
+host = '127.0.0.1'
+port = 2000
+timeout = 25
+sync = True
+num_vehicles = 30
+num_pedestrians = 40
 
 def main():
-    with CarlaHandler() as carla_handler, PygameHandler() as pygame_handler:
+    simulation_manager = None
+    spawn_manager = None
+    display_manager = None
+    try:
+        #client = carla.Client(host, port)
+        #client.set_timeout(timeout)
+
+        # Simulation Manager 
+        simulation_manager = SimulationManager(reset=True, sync=sync, fixed_delta_seconds=0.05)
+        #spawn_manager = SpawnManager(client, SpawnManagerConfig(sync=sync))
+        #spawn_manager.spawn_vehicles(num_vehicles)
+        #spawn_manager.spawn_pedestrians(num_pedestrians)
+
+        # Display Manager organizes all the sensors an its display in a window
+        # It is easy to configure the grid and total window size
+        # If fps is set here, the framerate will be max locked to it
+        display_manager = DisplayManager(grid_size=[1, 3], window_size=[1800, 800], fps=30)
+
+        # SensorManager spawns RGBCamera, DepthCamera, LiDARs, ... as needed
+        # and assign each of them to a grid position,
+        hero = simulation_manager.spawn_manager.vehicles[0]
+        SensorManager(world=simulation_manager.world, 
+                      display_man=display_manager,
+                      display_pos=[0, 0],
+                      sensor_type=SensorType.LIDAR,
+                      transform=carla.Transform(SensorManager.get_mounting_position(hero, MountingPosition.TOP), carla.Rotation(yaw=+00)), 
+                      attached=hero,
+                      image_size=[800,600],
+                      sensor_options={'channels' : '64', 'range' : '100',  'points_per_second': '250000', 'rotation_frequency': '50'})
+        SensorManager(world=simulation_manager.world, 
+                      display_man=display_manager,
+                      display_pos=[0, 1],
+                      sensor_type=SensorType.CAMERA_RGB,
+                      transform=carla.Transform(SensorManager.get_mounting_position(hero, MountingPosition.FRONT), carla.Rotation(yaw=+00)), 
+                      attached=hero,
+                      image_size=[800,600],
+                      sensor_options={})
+        SensorManager(world=simulation_manager.world, 
+                      display_man=display_manager,
+                      display_pos=[0, 2],
+                      sensor_type=SensorType.CAMERA_DEPTH_CAMERA,
+                      transform=carla.Transform(SensorManager.get_mounting_position(hero, MountingPosition.FRONT), carla.Rotation(yaw=+00)), 
+                      attached=hero,
+                      image_size=[800,600],
+                      sensor_options={})
+
         while True:
-            world, world_snapshot, *sensors_data = carla_handler.tick()
-            if not pygame_handler.tick():
-                break
-            pygame_handler.update_display(world, world_snapshot, *sensors_data)
+            # Carla Tick
+            world_snapshot = simulation_manager.tick()
+            # Render received data
+            display_manager.draw_sensors()
+            display_manager.draw_fps(world_snapshot.timestamp.delta_seconds)
+            display_manager.tick()
+    except KeyboardInterrupt as ex:
+            print('\nCancelled by user. Bye!')
+    finally:
+        if display_manager:
+            display_manager.destroy()
+        if spawn_manager:
+            spawn_manager.destroy()
+        if simulation_manager:
+            simulation_manager.destroy()
 
 if __name__ == '__main__':
-    try:
-        main()
-    except KeyboardInterrupt:
-        print('\nCancelled by user. Bye!')
+    main()
+
+
+
+#            # Visualize display stats
+#            pygame_handler.draw_fps(world_snapshot.timestamp.delta_seconds)
+#
+#            # Draw images
+#            pygame_handler.draw_image(extract_image_rgb(image_rgb))
+#            pygame_handler.draw_image(extract_image_rgb(image_insemseg), blend=True)
+#
+#            # Test
+#            bbs = world.get_level_bbs(carla.CityObjectLabel.Car)
+#            
+#            # Visualize filtered bounding boxes
+#            vehicles = [actor for actor in world.get_actors().filter('vehicle.*')]
+#            bb_boxes = BoundingBoxes.get_camera_bounding_boxes(vehicles, image_rgb)
+#            bb_boxes = BoundingBoxes.filter_occluded(bb_boxes, image_depth)
+#            pygame_handler.draw_bounding_boxes(bb_boxes)
+#            print(f"Detected {len(bb_boxes)} bounding boxes of {len(vehicles)}")

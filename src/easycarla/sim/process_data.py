@@ -49,24 +49,3 @@ def process_data(
         image_depth_dir = output_dir / "image_depth"
         image_depth_dir.mkdir(parents=True, exist_ok=True)
         image_depth.save_to_disk(str(image_depth_dir / f'{image_depth.frame}.png'), carla.ColorConverter.LogarithmicDepth)
-
-
-"""
-    # Get transformations
-    lidar_transform = lidar.transform
-    camera_transform = image_rgb.transform
-
-    # Get camera intrinsic matrix
-    K = get_camera_intrinsic(image_rgb)
-    
-    # Extract LiDAR points
-    lidar_points = np.frombuffer(lidar.raw_data, dtype=np.dtype('f4'))
-    lidar_points = np.reshape(lidar_points, (int(lidar_points.shape[0] / 4), 4))
-    
-    # Convert RGB image to numpy array
-    img_rgb = np.frombuffer(image_rgb.raw_data, dtype=np.uint8).reshape((image_rgb.height, image_rgb.width, 4))[:, :, :3]
-
-    # Save to disk
-    save_to_disk(lidar=lidar, image_rgb=image_rgb, image_depth=image_depth, image_insemseg=image_insemseg)
-
-"""

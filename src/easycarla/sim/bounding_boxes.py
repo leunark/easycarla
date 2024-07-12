@@ -104,35 +104,6 @@ class BoundingBoxes(object):
         calibration[0, 0] = calibration[1, 1] = image.width / (2.0 * np.tan(image.fov * np.pi / 360.0))
         return calibration
 
-
-    @staticmethod
-    def draw_bounding_boxes(display, bounding_boxes, image: carla.Image):
-        """
-        Draws bounding boxes on pygame display.
-        """
-        bb_surface = pygame.Surface((image.width, image.height))
-        bb_surface.set_colorkey((0, 0, 0))
-        bb_color = (248, 64, 24)
-        for bbox in bounding_boxes:
-            points = [(int(bbox[i, 0]), int(bbox[i, 1])) for i in range(8)]
-            # draw lines
-            # base
-            pygame.draw.line(bb_surface, bb_color, points[0], points[1])
-            pygame.draw.line(bb_surface, bb_color, points[1], points[2])
-            pygame.draw.line(bb_surface, bb_color, points[2], points[3])
-            pygame.draw.line(bb_surface, bb_color, points[3], points[0])
-            # top
-            pygame.draw.line(bb_surface, bb_color, points[4], points[5])
-            pygame.draw.line(bb_surface, bb_color, points[5], points[6])
-            pygame.draw.line(bb_surface, bb_color, points[6], points[7])
-            pygame.draw.line(bb_surface, bb_color, points[7], points[4])
-            # base-top
-            pygame.draw.line(bb_surface, bb_color, points[0], points[4])
-            pygame.draw.line(bb_surface, bb_color, points[1], points[5])
-            pygame.draw.line(bb_surface, bb_color, points[2], points[6])
-            pygame.draw.line(bb_surface, bb_color, points[3], points[7])
-        display.blit(bb_surface, (0, 0))
-
     @staticmethod
     def draw_bounding_boxes_in_world(world: carla.World, vehicles: list[carla.Vehicle]):
         """

@@ -1,28 +1,63 @@
 import pygame
 import numpy as np
 
-class PygameHandler:
-    def __init__(self, width=800, height=600):
-        self.width = width
-        self.height = height
+class DisplayManager:
+    def __init__(self, grid_size, window_size, fps: float = 0.0):
+        """ If fps is 0, the framerate will be uncapped and the simulation runs as fast as it can. 
+        Setting fps will lock the framerate by forcing a delay of 1/fps sec till the next tick.
+        """
+        self.grid_size = grid_size
+        self.window_size = window_size
+        self.fps = fps
 
-    def __enter__(self):
+        # Create the window
         pygame.init()
-        self.display = pygame.display.set_mode((self.width, self.height), pygame.HWSURFACE | pygame.DOUBLEBUF)
-        self.font = self.get_font()
+        pygame.font.init()
+        self.display = pygame.display.set_mode(window_size, pygame.HWSURFACE | pygame.DOUBLEBUF)
         self.clock = pygame.time.Clock()
-        return self
+        self.font = self.get_font()
+        
+        self.sensor_list = []
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        pygame.quit()
+    def get_window_size(self):
+        return [int(self.window_size[0]), int(self.window_size[1])]
 
+    def get_display_size(self):
+        return [int(self.window_size[0]/self.grid_size[1]), int(self.window_size[1]/self.grid_size[0])]
+
+    def get_display_offset(self, gridPos):
+        dis_size = self.get_display_size()
+        return [int(gridPos[1] * dis_size[0]), int(gridPos[0] * dis_size[1])]
+
+    def add_sensor(self, sensor):
+        self.sensor_list.append(sensor)
+
+    def get_sensor_list(self):
+        return self.sensor_list
+
+    def draw_sensors(self):
+        if self.render_enabled():
+            for s in self.sensor_list:
+                s.render()
+
+    def destroy(self):
+        for s in self.sensor_list:
+            s.destroy()
+
+    def render_enabled(self):
+        return self.display != None
+    
     def tick(self) -> bool:
+        # Must listen to events to prevent unresponsive window
         if self.should_quit():
             return False
+
         # Update display
         pygame.display.flip()
-        # Tick the clock to calculate fps
-        self.clock.tick()
+
+        # Tick the clock to measure frame times
+        self.clock.tick(self.fps)
+
         return True        
 
     def draw_fps(self, delta_seconds: int):
@@ -89,4 +124,3 @@ class PygameHandler:
                 if event.key == pygame.K_ESCAPE:
                     return True
         return False
-

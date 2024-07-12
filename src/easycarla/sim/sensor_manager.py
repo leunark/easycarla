@@ -5,7 +5,7 @@ import numpy as np
 from enum import Enum
 import pygame
 
-from easycarla.sim.display_manager import DisplayManager
+from easycarla.sim.display_manager import DisplayManager, ScaleMode
 
 
 class SensorType(Enum):
@@ -22,12 +22,7 @@ class MountingPosition(Enum):
     REAR = 4
     RIGHT = 5
 
-class ScaleMode(Enum):
-    NORMAL = 1
-    ZOOM_CENTER = 2
-    STRETCH_FIT = 3
-
-class SensorManager:
+class Sensor:
     def __init__(self, 
                  world: carla.World, 
                  display_man: DisplayManager,
@@ -93,7 +88,7 @@ class SensorManager:
                 camera_bp.set_attribute(key, self.sensor_options[key])
 
             camera = self.world.spawn_actor(camera_bp, self.transform, attach_to=self.attached_actor)
-            camera.listen(self.save_rgb_image)
+            camera.listen(lambda image: self.save_rgb_image(image, carla.ColorConverter.Raw))
 
             return camera
 
@@ -129,6 +124,14 @@ class SensorManager:
 
     def get_sensor(self):
         return self.sensor
+    
+    def render(self):
+        if self.surface is not None:
+            self.display_man.draw_surface(self.surface, self.display_pos, self.scale_mode)
+
+    def destroy(self):
+        self.sensor.stop()
+        self.sensor.destroy()
 
     def read_rgb_image(self, image: carla.Image, color_converter: carla.ColorConverter = carla.ColorConverter.Raw):
         image.convert(color_converter)
@@ -137,36 +140,6 @@ class SensorManager:
         array = array[:, :, :3]
         array = array[:, :, ::-1]
         return array
-    
-    @staticmethod
-    def decode_depth_image(image: carla.Image):
-        """
-        Decodes a depth image from Carla to create a depth matrix.
-        
-        Args:
-            image (carla.Image): The depth image obtained from Carla.
-            
-        Returns:
-            np.ndarray: The decoded depth matrix.
-        """
-        # Convert the image raw data to a numpy array
-        image_data = np.frombuffer(image.raw_data, dtype=np.uint8)
-        
-        # Reshape array into (height, width, 4) where the last dimension is RGBA
-        image_data = np.reshape(image_data, (image.height, image.width, 4))
-        
-        # Extract the R, G, and B channels (ignore A)
-        R = image_data[:, :, 2].astype(np.float32)
-        G = image_data[:, :, 1].astype(np.float32)
-        B = image_data[:, :, 0].astype(np.float32)
-        
-        # Calculate the normalized depth
-        normalized_depth = (R + G * 256.0 + B * 256.0 * 256.0) / (256.0 * 256.0 * 256.0 - 1)
-        
-        # Convert normalized depth to meters
-        depth_in_meters = 1000.0 * normalized_depth
-        
-        return depth_in_meters
     
     def save_rgb_image(self, image, color_converter: carla.ColorConverter = carla.ColorConverter.Raw):
         t_start = self.timer()
@@ -236,17 +209,6 @@ class SensorManager:
         self.time_processing += (t_end-t_start)
         self.tics_processing += 1
 
-    def render(self):
-        if self.surface is not None:
-            display_offset = self.display_man.get_display_offset(self.display_pos)
-            display_size = self.display_man.get_display_size()
-            dest_rect = pygame.Rect(*display_offset, *display_size)
-            self.draw_surface(self.surface, self.display_man.display, dest_rect, self.scale_mode)
-
-    def destroy(self):
-        self.sensor.stop()
-        self.sensor.destroy()
-
     @staticmethod
     def get_mounting_position(actor: carla.Actor, position: MountingPosition, offset=0.5):
         # Get the actor's bounding box
@@ -275,35 +237,39 @@ class SensorManager:
         return mount_location
 
     @staticmethod
-    def draw_surface(src_surface: pygame.Surface, dest_surface: pygame.Surface, dest_rect: pygame.Rect, scale_mode: ScaleMode):
-        if scale_mode == ScaleMode.NORMAL:
-            # Normal scaling, blit the source surface onto the destination surface
-            src_rect = src_surface.get_rect()
-            crop_rect = pygame.Rect(
-                (src_rect.width - dest_rect.width) // 2, 
-                (src_rect.height - dest_rect.height) // 2,
-                dest_rect.width,
-                dest_rect.height
-            )
-            src_surface = src_surface.subsurface(crop_rect)
-            dest_surface.blit(src_surface, dest_rect.topleft)
+    def decode_depth_image(image: carla.Image):
+        """
+        Decodes a depth image from Carla to create a depth matrix.
+        
+        Args:
+            image (carla.Image): The depth image obtained from Carla.
+            
+        Returns:
+            np.ndarray: The decoded depth matrix.
+        """
+        # Convert the image raw data to a numpy array
+        image_data = np.frombuffer(image.raw_data, dtype=np.uint8)
+        
+        # Reshape array into (height, width, 4) where the last dimension is RGBA
+        image_data = np.reshape(image_data, (image.height, image.width, 4))
+        
+        # Extract the R, G, and B channels (ignore A)
+        R = image_data[:, :, 2].astype(np.float32)
+        G = image_data[:, :, 1].astype(np.float32)
+        B = image_data[:, :, 0].astype(np.float32)
+        
+        # Calculate the normalized depth
+        normalized_depth = (R + G * 256.0 + B * 256.0 * 256.0) / (256.0 * 256.0 * 256.0 - 1)
+        
+        # Convert normalized depth to meters
+        depth_in_meters = 1000.0 * normalized_depth
+        
+        return depth_in_meters
 
-        elif scale_mode == ScaleMode.ZOOM_CENTER:
-            # Zoom and center the source surface to fit inside the destination rectangle
-            src_rect = src_surface.get_rect()
-            scale = max(dest_rect.width / src_rect.width, dest_rect.height / src_rect.height)
-            src_surface = pygame.transform.scale(src_surface, (src_rect.width * scale, src_rect.height * scale))
-            src_rect = src_surface.get_rect()
-            crop_rect = pygame.Rect(
-                (src_rect.width - dest_rect.width) // 2, 
-                (src_rect.height - dest_rect.height) // 2,
-                dest_rect.width,
-                dest_rect.height
-            )
-            src_surface = src_surface.subsurface(crop_rect)
-            dest_surface.blit(src_surface, dest_rect.topleft)
+class SensorManager:
 
-        elif scale_mode == ScaleMode.STRETCH_FIT:
-            # Stretch the source surface to fit the destination rectangle
-            src_surface = pygame.transform.scale(src_surface, (dest_rect.width, dest_rect.height))
-            dest_surface.blit(src_surface, dest_rect.topleft)
+    def __init__(self, sensors: list[Sensor]) -> None:
+        self.sensors = sensors
+
+
+    

@@ -1,19 +1,31 @@
 import pygame
 import numpy as np
+from enum import Enum
+
+class ScaleMode(Enum):
+    NORMAL = 1
+    ZOOM_CENTER = 2
+    STRETCH_FIT = 3
 
 class DisplayManager:
-    def __init__(self, grid_size, window_size, fps: float = 0.0):
+
+    DEFAULT_DISPLAY_RESOLUTION_FACTOR = 0.75
+
+    def __init__(self, grid_size: tuple[int, int], window_size: tuple[int, int] = None, fps: float = 0.0):
         """ If fps is 0, the framerate will be uncapped and the simulation runs as fast as it can. 
         Setting fps will lock the framerate by forcing a delay of 1/fps sec till the next tick.
         """
+
         self.grid_size = grid_size
-        self.window_size = window_size
         self.fps = fps
 
         # Create the window
         pygame.init()
         pygame.font.init()
-        self.display = pygame.display.set_mode(window_size, pygame.HWSURFACE | pygame.DOUBLEBUF)
+        info = pygame.display.Info()
+        self.window_size = (int(info.current_w * self.DEFAULT_DISPLAY_RESOLUTION_FACTOR), 
+                            int(info.current_h * self.DEFAULT_DISPLAY_RESOLUTION_FACTOR)) if window_size is None else window_size
+        self.display = pygame.display.set_mode(self.window_size, pygame.HWSURFACE | pygame.DOUBLEBUF)
         self.clock = pygame.time.Clock()
         self.font = self.get_font()
         
@@ -124,3 +136,43 @@ class DisplayManager:
                 if event.key == pygame.K_ESCAPE:
                     return True
         return False
+    
+    def draw_surface(self, surface: pygame.Surface, display_pos: tuple[int, int], scale_mode: ScaleMode):
+        display_offset = self.get_display_offset(display_pos)
+        display_size = self.get_display_size()
+        dest_rect = pygame.Rect(*display_offset, *display_size)
+        self.draw_surface_on_surface(surface, self.display, dest_rect, scale_mode)
+
+    @staticmethod
+    def draw_surface_on_surface(src_surface: pygame.Surface, dest_surface: pygame.Surface, dest_rect: pygame.Rect, scale_mode: ScaleMode):
+        if scale_mode == ScaleMode.NORMAL:
+            # Normal scaling, blit the source surface onto the destination surface
+            src_rect = src_surface.get_rect()
+            crop_rect = pygame.Rect(
+                (src_rect.width - dest_rect.width) // 2, 
+                (src_rect.height - dest_rect.height) // 2,
+                dest_rect.width,
+                dest_rect.height
+            )
+            src_surface = src_surface.subsurface(crop_rect)
+            dest_surface.blit(src_surface, dest_rect.topleft)
+
+        elif scale_mode == ScaleMode.ZOOM_CENTER:
+            # Zoom and center the source surface to fit inside the destination rectangle
+            src_rect = src_surface.get_rect()
+            scale = max(dest_rect.width / src_rect.width, dest_rect.height / src_rect.height)
+            src_surface = pygame.transform.scale(src_surface, (src_rect.width * scale, src_rect.height * scale))
+            src_rect = src_surface.get_rect()
+            crop_rect = pygame.Rect(
+                (src_rect.width - dest_rect.width) // 2, 
+                (src_rect.height - dest_rect.height) // 2,
+                dest_rect.width,
+                dest_rect.height
+            )
+            src_surface = src_surface.subsurface(crop_rect)
+            dest_surface.blit(src_surface, dest_rect.topleft)
+
+        elif scale_mode == ScaleMode.STRETCH_FIT:
+            # Stretch the source surface to fit the destination rectangle
+            src_surface = pygame.transform.scale(src_surface, (dest_rect.width, dest_rect.height))
+            dest_surface.blit(src_surface, dest_rect.topleft)

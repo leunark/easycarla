@@ -20,14 +20,14 @@ class DisplayManager:
         self.sensor_list = []
 
     def get_window_size(self):
-        return [int(self.window_size[0]), int(self.window_size[1])]
+        return (int(self.window_size[0]), int(self.window_size[1]))
 
     def get_display_size(self):
-        return [int(self.window_size[0]/self.grid_size[1]), int(self.window_size[1]/self.grid_size[0])]
+        return (int(self.window_size[0]/self.grid_size[1]), int(self.window_size[1]/self.grid_size[0]))
 
     def get_display_offset(self, gridPos):
         dis_size = self.get_display_size()
-        return [int(gridPos[1] * dis_size[0]), int(gridPos[0] * dis_size[1])]
+        return (int(gridPos[1] * dis_size[0]), int(gridPos[0] * dis_size[1]))
 
     def add_sensor(self, sensor):
         self.sensor_list.append(sensor)

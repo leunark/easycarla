@@ -119,7 +119,7 @@ class SpawnManager:
             self.pedestrians.append(pedestrian)
             self.pedestrian_controllers.append(controller)
         
-        # We need to tick the world once to make the controllers available in sync mode
+        # IMPORTANT NOTE: We need to tick the world once to make the controllers available in sync mode
         if self.sync:
             self.world.tick()
 

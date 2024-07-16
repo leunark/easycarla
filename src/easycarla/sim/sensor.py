@@ -47,6 +47,8 @@ class Sensor:
         self.sensor_options = sensor_options
         self.image_size = image_size
 
+        self.sensor_data = None
+        self.decoded_data = None
         self.surface = None
         self.max_queue_size = 100
         self.queue = queue.Queue(self.max_queue_size)
@@ -89,6 +91,15 @@ class Sensor:
         for key in self.sensor_options:
             bp.set_attribute(key, self.sensor_options[key])
 
+        # Calculate once calibration matrix
+        if self.sensor_type == SensorType.CAMERA_RGB or self.sensor_type == SensorType.CAMERA_INSTANCE_SEGMENTATION or self.sensor_type == SensorType.CAMERA_DEPTH_CAMERA:
+            fov = bp.get_attribute('fov').as_float()
+            width = bp.get_attribute('image_size_x').as_int()
+            height = bp.get_attribute('image_size_y').as_int()
+            self.calibration = self.build_projection_matrix(width, height, fov=fov)
+        else:
+            self.calibration = None
+
         sensor = self.world.spawn_actor(bp, self.transform, attach_to=self.attached_actor)
         sensor.listen(self.produce)
 
@@ -106,6 +117,8 @@ class Sensor:
         while True:
             data = self.queue.get(block=True, timeout=timeout)
             if data.frame >= frame:
+                self.decoded_data = self.decode_data(data)
+                self.create_surface(self.decoded_data)
                 return data
 
     def render(self):
@@ -122,26 +135,26 @@ class Sensor:
             self.sensor.stop()
             self.sensor.destroy()
     
-    def create_surface(self, data: carla.SensorData):
-        # Deocde sensor data
+    def decode_data(self, data: carla.SensorData):
         if self.sensor_type == SensorType.CAMERA_RGB:
-            image = self.decode_image_rgb(data)
-            image = image.swapaxes(0, 1)
+            decoded_data = self.decode_image_rgb(data)
         elif self.sensor_type == SensorType.CAMERA_DEPTH_CAMERA:
             data.convert(carla.ColorConverter.Depth)
-            image = self.decode_image_rgb(data)
-            image_depths = image[:, :, 0].astype(np.float32) / 255.0 * 1000.0
-            image = image.swapaxes(0, 1)
+            decoded_data = self.decode_image_rgb(data)
+            #image_depths = image[:, :, 0].astype(np.float32) / 255.0 * 1000.0
         elif self.sensor_type == SensorType.CAMERA_INSTANCE_SEGMENTATION:
-            image = self.decode_image_rgb(data)
-            image = image.swapaxes(0, 1)
+            decoded_data = self.decode_image_rgb(data)
         elif self.sensor_type == SensorType.LIDAR:
-            pc = self.decode_lidar(data)
-            image = self.pc_to_img(pc)
+            decoded_data = self.decode_lidar(data)
         else:
             raise Exception(f'Invalid Sensor Type {self.sensor_type}')
-        
-        # Create surface from the generated image
+        return decoded_data
+
+    def create_surface(self, data: np.ndarray):
+        if self.sensor_type == SensorType.LIDAR:
+            image = self.pc_to_img(data)
+        else:
+            image = data.swapaxes(0, 1)
         self.surface = pygame.surfarray.make_surface(image)
 
     @staticmethod
@@ -201,3 +214,12 @@ class Sensor:
             raise ValueError("Invalid mounting position")
 
         return mount_location
+    
+    @staticmethod
+    def build_projection_matrix(w: int, h: int, fov: float):
+        focal = w / (2.0 * np.tan(fov * np.pi / 360.0))
+        K = np.identity(3)
+        K[0, 0] = K[1, 1] = focal
+        K[0, 2] = w / 2.0
+        K[1, 2] = h / 2.0
+        return K

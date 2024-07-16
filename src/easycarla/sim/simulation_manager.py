@@ -55,6 +55,7 @@ class SimulationManager:
 
     def destroy(self):
         #self.sync_mode.__exit__(exc_type, exc_val, exc_tb)
+        self._settings.synchronous_mode = False
         self.world.apply_settings(self._settings)
         self.executor.shutdown(wait=True)
 

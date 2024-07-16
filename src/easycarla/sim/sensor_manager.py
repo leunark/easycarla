@@ -11,11 +11,15 @@ import threading
 
 from easycarla.sim.display_manager import DisplayManager, ScaleMode
 from easycarla.sim.sensor import Sensor, SensorType
-
+from easycarla.sim.bbs import BBS
 
 class SensorManager:
 
-    def __init__(self, world: carla.World, display_manager: DisplayManager, sensors: list[Sensor], timeout=1.0) -> None:
+    def __init__(self, 
+                 world: carla.World, 
+                 display_manager: DisplayManager, 
+                 sensors: list[Sensor], 
+                 timeout=1.0) -> None:
         self.sensors = sensors
         self.world = world
         self.display_manager = display_manager
@@ -35,19 +39,26 @@ class SensorManager:
             world_snapshot = self.queue.get(block=True, timeout=self.timeout)
             
             # Consume sensor data
-            synced_data = []
-            for index, sensor in enumerate(self.sensors):
+            sensor_data_list: list[Sensor] = []
+            decoded_data_list = []
+            for sensor in self.sensors:
                 data = sensor.consume(world_snapshot.frame, timeout=1.0)
-                if data is not None:
-                    sensor.create_surface(data)
-                synced_data.append(data)
-            
-            # Get Bounding Boxes and filter them
-            # Decode sensors
-            # Project bounding boxes onto image
-            # Filter occluded objects with instance segmentation
-            # Export data 
+                sensor_data_list.append(data)
+                #decoded_data = sensor.decode_data(data)
+                #decoded_data_list.append(decoded_data)
 
+            # Get bounding boxes in world coordinate
+            bbs = BBS.get_vehicles_and_pedestrians_bbs(self.world)
+
+            
+
+            # Create surface for visualization
+            #for sensor, decoded_data in zip(self.sensors, decoded_data_list):
+            #    sensor.create_surface(decoded_data)
+
+            # Project bounding boxes onto image
+            # https://carla.readthedocs.io/en/0.9.14/tuto_G_bounding_boxes/
+            
             # Render data
             self.draw_sensors()
             self.display_manager.draw_fps(world_snapshot.timestamp.delta_seconds)
@@ -55,22 +66,6 @@ class SensorManager:
         except queue.Empty:
             pass
 
-    def run(self):
-        while not self._stop_event.is_set():
-            self.consume()
-
-    def start(self):
-        self._stop_event.clear()
-        self._thread = threading.Thread(target=self.run)
-        self._thread.daemon = True
-        self._thread.start()
-
-    def stop(self):
-        self._stop_event.set()
-        if self._thread is not None:
-            self._thread.join()
-
     def destroy(self):
-        self.stop()
         for sensor in self.sensors:
             sensor.destroy()

@@ -1,11 +1,14 @@
 import pygame
 import numpy as np
 from enum import Enum
+from easycarla.sensors.sensor import Sensor
+
 
 class ScaleMode(Enum):
     NORMAL = 1
-    ZOOM_CENTER = 2
-    STRETCH_FIT = 3
+    SCALE_FIT = 2
+    ZOOM_CENTER = 3
+    STRETCH_FIT = 4
 
 class DisplayManager:
 
@@ -15,7 +18,6 @@ class DisplayManager:
         """ If fps is 0, the framerate will be uncapped and the simulation runs as fast as it can. 
         Setting fps will lock the framerate by forcing a delay of 1/fps sec till the next tick.
         """
-
         self.grid_size = grid_size
         self.fps = fps
 
@@ -29,6 +31,8 @@ class DisplayManager:
         self.clock = pygame.time.Clock()
         self.font = self.get_font()
 
+        self.sensors: list[Sensor, tuple[int, int], ScaleMode] = []
+
     def get_window_size(self):
         return (int(self.window_size[0]), int(self.window_size[1]))
 
@@ -38,6 +42,12 @@ class DisplayManager:
     def get_display_offset(self, gridPos):
         dis_size = self.get_display_size()
         return (int(gridPos[1] * dis_size[0]), int(gridPos[0] * dis_size[1]))
+
+    def add_sensor(self, sensor: Sensor, display_pos: tuple[int, int], scale_mode: ScaleMode = ScaleMode.NORMAL):
+        if display_pos[0] < 0 or display_pos[0] >= self.grid_size[0] or \
+            display_pos[1] < 0 or display_pos[1] >= self.grid_size[1] :
+            raise ValueError(f"Display position {display_pos} not in grid {self.grid_size}")
+        self.sensors.append((sensor, display_pos, scale_mode))
 
     def render_enabled(self):
         return self.display != None
@@ -49,6 +59,9 @@ class DisplayManager:
 
         # Update display
         pygame.display.flip()
+        
+        # Clean the surface by filling it with black color
+        self.display.fill((0, 0, 0))
 
         # Tick the clock to measure frame times
         self.clock.tick(self.fps)
@@ -65,6 +78,13 @@ class DisplayManager:
             self.font.render(f'{fps_simulated} FPS (simulated)', True, (255, 255, 255)),
             (8, 28))
 
+    def draw_sensors(self):
+        for sensor, display_pos, scale_mode in self.sensors:
+            if sensor.decoded_data is not None:
+                img = sensor.to_img()
+                surface = pygame.surfarray.make_surface(img)
+                self.draw_surface(surface, display_pos, scale_mode)
+            
     def draw_bounding_boxes(self, bounding_boxes: np.ndarray):
         """
         Draws bounding boxes on pygame display.
@@ -130,15 +150,16 @@ class DisplayManager:
     def draw_surface_on_surface(src_surface: pygame.Surface, dest_surface: pygame.Surface, dest_rect: pygame.Rect, scale_mode: ScaleMode):
         if scale_mode == ScaleMode.NORMAL:
             # Normal scaling, blit the source surface onto the destination surface
-            src_rect = src_surface.get_rect()
-            crop_rect = pygame.Rect(
-                (src_rect.width - dest_rect.width) // 2, 
-                (src_rect.height - dest_rect.height) // 2,
-                dest_rect.width,
-                dest_rect.height
-            )
-            src_surface = src_surface.subsurface(crop_rect)
             dest_surface.blit(src_surface, dest_rect.topleft)
+
+        elif scale_mode == ScaleMode.SCALE_FIT:
+            # Scale the source surface to fit inside the destination rectangle
+            src_rect = src_surface.get_rect()
+            scale = min(dest_rect.width / src_rect.width, dest_rect.height / src_rect.height)
+            src_surface = pygame.transform.scale(src_surface, (src_rect.width * scale, src_rect.height * scale))
+            src_rect = src_surface.get_rect()
+            dest = (dest_rect.topleft[0], dest_rect.topleft[1] + (dest_rect.height - src_rect.height) // 2)
+            dest_surface.blit(src_surface, dest)
 
         elif scale_mode == ScaleMode.ZOOM_CENTER:
             # Zoom and center the source surface to fit inside the destination rectangle

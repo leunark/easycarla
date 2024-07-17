@@ -114,38 +114,39 @@ def main():
             
             # Draw bounding boxes
             try:
-                bbs = world_sensor.get_vehicles_and_pedestrians_bbs()
-                count = 0
-                for bb in bbs:
-                    # Filter for distance from ego vehicle
-                    if bb.location.distance(hero.get_transform().location) < 100:
-                        # Calculate the dot product between the forward vector
-                        # of the vehicle and the vector between the vehicle
-                        # and the bounding box. We threshold this dot product
-                        # to limit to drawing bounding boxes IN FRONT OF THE CAMERA
-                        forward_vec = rgb_sensor.sensor.get_transform().get_forward_vector()
-                        ray = bb.location - rgb_sensor.sensor.get_transform().location
-                        
-                        if forward_vec.dot(ray) > 1:
-                            count += 1
-                            
-                            # Cycle through the vertices
-                            verts = [v for v in bb.get_world_vertices(carla.Transform())]
-                            for edge in edges:
-                                # Join the vertices into edges
-                                
-                                p1 = rgb_sensor.project(verts[edge[0]]).astype(int)
-                                p2 = rgb_sensor.project(verts[edge[1]]).astype(int)
-                                
-                                # Draw the edges into the camera output
-                                image_width, image_height = rgb_sensor.image_size
+                # Vectorize hero transform
+                hero_pos = hero.get_transform().location
+                hero_pos = np.array([hero_pos.x, hero_pos.y, hero_pos.z])
+                hero_forward = hero.get_transform().get_forward_vector()
+                hero_forward = np.array([hero_forward.x, hero_forward.y, hero_forward.z])
 
-                                if 0 <= p1[0] < image_width and 0 <= p1[1] < image_height and \
-                                    0 <= p2[0] < image_width and 0 <= p2[1] < image_height:
-                                    cv2.line(rgb_sensor.decoded_data, (int(p1[0]),int(p1[1])), (int(p2[0]),int(p2[1])), (0,0,255), 1)
+                # Retrieve bounding boxes
+                bbs = world_sensor.get_bounding_boxes()
+                if len(bbs) > 0:
+                    # Filter bbs within squared distance
+                    delta_pos = (bbs[:, 0] - hero_pos)
+                    sq_dist = (delta_pos**2).sum(axis=1)
+                    bbs = bbs[sq_dist < 50**2]
+                    
+                    # Filter bbs that are in front
+                    delta_pos = (bbs[:, 0] - hero_pos)
+                    bbs = bbs[delta_pos.dot(hero_forward) > 1]
 
+                    # Project edges onto sensor
+                    bbs_proj = rgb_sensor.project(bbs.reshape((-1, 3))).astype(int)
+                    bbs_proj = bbs_proj.reshape((*bbs.shape[:-1], -1))
 
-                logging.info(f"Detected {count} objects")
+                    # Retrieve all edges from bounding boxes
+                    bbs_proj_edges = bbs_proj[:, edges]
+
+                    # Draw edges within image boundaries
+                    image_width, image_height = rgb_sensor.image_size
+                    for bb in bbs_proj_edges:
+                        for edge in bb:
+                            p1, p2 = edge
+                            if 0 <= p1[0] < image_width and 0 <= p1[1] < image_height and \
+                                0 <= p2[0] < image_width and 0 <= p2[1] < image_height:
+                                cv2.line(rgb_sensor.decoded_data, (p1[0],p1[1]), (p2[0],p2[1]), (0,0,255), 1)
                 
             except Exception as ex:
                 traceback.print_exc()

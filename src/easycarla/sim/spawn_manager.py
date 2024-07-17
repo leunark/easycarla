@@ -77,14 +77,17 @@ class SpawnManager:
         self.traffic_manager.update_vehicle_lights(vehicle, random.uniform() < self.config.percentage_vehicles_lights_on)
         return vehicle
         
-    def spawn_vehicles(self, number_of_vehicles: int):
+    def spawn_vehicles(self, number_of_vehicles: int, filter: str = "vehicle.*"):
         spawn_points = self.world.get_map().get_spawn_points()
         random.shuffle(spawn_points)
+
+        blueprint_library = self.vehicle_blueprint_library.filter(filter)
+        blueprints = [bp for bp in blueprint_library if bp.get_attribute("base_type") not in []]
 
         for spawn_point in spawn_points:
             if len(self.vehicles) >= number_of_vehicles:
                 break
-            blueprint = random.choice(self.vehicle_blueprint_library)
+            blueprint = random.choice(blueprints)
             vehicle = self.spawn_vehicle(blueprint, spawn_point)
             if vehicle:
                 self.vehicles.append(vehicle)

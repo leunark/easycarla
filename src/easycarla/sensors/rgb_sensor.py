@@ -36,9 +36,9 @@ class RgbSensor(Sensor):
         img = self.decoded_data.swapaxes(0, 1)
         return img
     
-    def project(self, point: carla.Location) -> np.ndarray:
-        return self.get_image_point(
-            loc=point,
+    def project(self, points: np.ndarray) -> np.ndarray:
+        return self.get_image_points(
+            points=points,
             K=self.calibration, 
             w2c=self.get_world_to_actor())
 
@@ -49,26 +49,29 @@ class RgbSensor(Sensor):
         return self.build_projection_matrix(width, height, fov=fov)
 
     @staticmethod
-    def get_image_point(loc: carla.Location, K: np.ndarray, w2c: np.ndarray) -> np.ndarray:
-        """Calculate 2D projection of 3D coordinate"""
-
-        # Format the input coordinate (loc is a carla.Position object)
-        point = np.array([loc.x, loc.y, loc.z, 1])
-        # transform to camera coordinates
-        point_camera = np.dot(w2c, point)
-
-        # New we must change from UE4's coordinate system to an "standard"
-        # (x, y ,z) -> (y, -z, x)
-        # and we remove the fourth componebonent also
-        point_camera = [point_camera[1], -point_camera[2], point_camera[0]]
-
-        # now project 3D->2D using the camera matrix
-        point_img = np.dot(K, point_camera)
-        # normalize
-        point_img[0] /= point_img[2]
-        point_img[1] /= point_img[2]
-
-        return point_img[0:2]
+    def get_image_points(points: np.ndarray, K: np.ndarray, w2c: np.ndarray) -> np.ndarray:
+        """Calculate 2D projections of multiple 3D coordinates"""
+        # Ensure points is a 2D array
+        points = np.atleast_2d(points)
+        
+        # Add homogeneous coordinate
+        points_homogeneous = np.hstack((points, np.ones((points.shape[0], 1))))
+        
+        # Transform to camera coordinates
+        points_camera = np.dot(w2c, points_homogeneous.T).T
+        
+        # Change from UE4's coordinate system to "standard"
+        # (x, y, z) -> (y, -z, x)
+        points_camera = points_camera[:, [1, 2, 0]]
+        points_camera[:, 1] *= -1
+        
+        # Project 3D->2D using the camera matrix
+        points_img = np.dot(K, points_camera.T).T
+        
+        # Normalize
+        points_img[:, :2] /= points_img[:, 2:3]
+        
+        return points_img[:, :2]
     
     @staticmethod
     def build_projection_matrix(w: int, h: int, fov: float):

@@ -31,7 +31,7 @@ class DisplayManager:
         self.clock = pygame.time.Clock()
         self.font = self.get_font()
 
-        self.sensors: list[Sensor, tuple[int, int], ScaleMode] = []
+        self.sensors: list[tuple[Sensor, tuple[int, int], ScaleMode]] = []
 
     def get_window_size(self):
         return (int(self.window_size[0]), int(self.window_size[1]))
@@ -84,7 +84,7 @@ class DisplayManager:
                 img = sensor.to_img()
                 surface = pygame.surfarray.make_surface(img)
                 self.draw_surface(surface, display_pos, scale_mode)
-            
+
     def draw_bounding_boxes(self, bounding_boxes: np.ndarray):
         """
         Draws bounding boxes on pygame display.

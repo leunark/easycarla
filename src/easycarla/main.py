@@ -4,6 +4,8 @@ import logging
 import random
 import traceback
 import time
+import cv2
+import numpy as np
 from concurrent.futures import ThreadPoolExecutor
 from easycarla.visu.pygame_handler import PygameHandler
 from easycarla.sim.simulation_manager import SimulationManager
@@ -54,7 +56,7 @@ def main():
         # Display Manager organizes all the sensors an its display in a window
         # It is easy to configure the grid and total window size
         # If fps is set here, the framerate will be max locked to it
-        display_manager = DisplayManager(grid_size=[1, 3], fps=fps)
+        display_manager = DisplayManager(grid_size=[1, 1], fps=fps)
 
         # Choose hero vehicle
         hero = random.choice(spawn_manager.vehicles)
@@ -79,9 +81,9 @@ def main():
             sensor_options={'channels' : '64', 'range' : '200',  'points_per_second': '250000', 'rotation_frequency': '30'})
 
         # Register sensors to be rendered
-        display_manager.add_sensor(rgb_sensor, (0, 1), ScaleMode.ZOOM_CENTER)
-        display_manager.add_sensor(depth_sensor, (0, 2), ScaleMode.ZOOM_CENTER)
-        display_manager.add_sensor(lidar_sensor, (0, 0), ScaleMode.SCALE_FIT)
+        display_manager.add_sensor(rgb_sensor, (0, 0), ScaleMode.ZOOM_CENTER)
+        #display_manager.add_sensor(depth_sensor, (0, 2), ScaleMode.ZOOM_CENTER)
+        #display_manager.add_sensor(lidar_sensor, (0, 0), ScaleMode.SCALE_FIT)
 
         sensors: list[Sensor] = [
             rgb_sensor, 
@@ -89,17 +91,64 @@ def main():
             lidar_sensor, 
         ]
 
+        # Remember the edge pairs
+        edges = [[0,1], [1,3], [3,2], [2,0], 
+                 [0,4], [4,5], [5,1], [5,7], 
+                 [7,6], [6,4], [6,2], [7,3]]
+
         def process():
-            # First consume world sensor
-            world_sensor.consume()
-            world_snapshot = world_sensor.sensor_data
-            
             # Consume sensor data
             try:
+                world_sensor.consume()
+                world_snapshot = world_sensor.sensor_data
                 for sensor in sensors:
                     sensor.consume(world_snapshot.frame, timeout=1.0)
             except Exception as ex:
                 logging.warning(f"Failed to consume on frame {world_snapshot.frame}")
+
+            # Gizmo on hero vehicle
+            world_sensor.world.debug.draw_arrow(
+                            hero.get_transform().location, 
+                            hero.get_transform().location + hero.get_transform().get_forward_vector(),
+                            thickness=0.1, arrow_size=0.1, color=carla.Color(255,0,0), life_time=10)
+            
+            # Draw bounding boxes
+            try:
+                bbs = world_sensor.get_vehicles_and_pedestrians_bbs()
+                count = 0
+                for bb in bbs:
+                    # Filter for distance from ego vehicle
+                    if bb.location.distance(hero.get_transform().location) < 100:
+                        # Calculate the dot product between the forward vector
+                        # of the vehicle and the vector between the vehicle
+                        # and the bounding box. We threshold this dot product
+                        # to limit to drawing bounding boxes IN FRONT OF THE CAMERA
+                        forward_vec = rgb_sensor.sensor.get_transform().get_forward_vector()
+                        ray = bb.location - rgb_sensor.sensor.get_transform().location
+                        
+                        if forward_vec.dot(ray) > 1:
+                            count += 1
+                            
+                            # Cycle through the vertices
+                            verts = [v for v in bb.get_world_vertices(carla.Transform())]
+                            for edge in edges:
+                                # Join the vertices into edges
+                                
+                                p1 = rgb_sensor.project(verts[edge[0]]).astype(int)
+                                p2 = rgb_sensor.project(verts[edge[1]]).astype(int)
+                                
+                                # Draw the edges into the camera output
+                                image_width, image_height = rgb_sensor.image_size
+
+                                if 0 <= p1[0] < image_width and 0 <= p1[1] < image_height and \
+                                    0 <= p2[0] < image_width and 0 <= p2[1] < image_height:
+                                    cv2.line(rgb_sensor.decoded_data, (int(p1[0]),int(p1[1])), (int(p2[0]),int(p2[1])), (0,0,255), 1)
+
+
+                logging.info(f"Detected {count} objects")
+                
+            except Exception as ex:
+                traceback.print_exc()
 
             # Render data
             display_manager.draw_sensors()

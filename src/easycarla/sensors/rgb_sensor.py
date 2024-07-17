@@ -17,6 +17,7 @@ class RgbSensor(Sensor):
                  max_queue_size: int = 100):
         super().__init__(world, attached_actor, mounting_position, mounting_direction, image_size, sensor_options, max_queue_size)
         self.calibration = self.get_calibration()
+        self.image_data = None
 
     def create_blueprint(self) -> carla.ActorBlueprint:
         bp = self.world.get_blueprint_library().find('sensor.camera.rgb')
@@ -29,26 +30,26 @@ class RgbSensor(Sensor):
         array = np.reshape(array, (data.height, data.width, 4))
         array = array[:, :, :3]
         array = array[:, :, ::-1]
-        return array
+        return array.copy()
 
     def to_img(self) -> np.ndarray:
         img = self.decoded_data.swapaxes(0, 1)
         return img
     
-    def project(self):
+    def project(self, point: carla.Location) -> np.ndarray:
         return self.get_image_point(
-            loc=self.sensor.get_transform(), 
+            loc=point,
             K=self.calibration, 
             w2c=self.get_world_to_actor())
 
-    def get_calibration(self):
+    def get_calibration(self) -> np.ndarray:
         fov = self.bp.get_attribute('fov').as_float()
         width = self.bp.get_attribute('image_size_x').as_int()
         height = self.bp.get_attribute('image_size_y').as_int()
         return self.build_projection_matrix(width, height, fov=fov)
 
     @staticmethod
-    def get_image_point(loc: carla.Location, K: np.ndarray, w2c: np.ndarray):
+    def get_image_point(loc: carla.Location, K: np.ndarray, w2c: np.ndarray) -> np.ndarray:
         """Calculate 2D projection of 3D coordinate"""
 
         # Format the input coordinate (loc is a carla.Position object)

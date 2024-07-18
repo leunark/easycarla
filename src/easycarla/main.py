@@ -7,14 +7,13 @@ import time
 import cv2
 import numpy as np
 from concurrent.futures import ThreadPoolExecutor
-from easycarla.visu.pygame_handler import PygameHandler
 from easycarla.sim.simulation_manager import SimulationManager
-from easycarla.sim.bounding_boxes import BoundingBoxes
 from easycarla.utils.carla_helper import extract_image_rgb
 from easycarla.sim.display_manager import DisplayManager, ScaleMode
 from easycarla.sensors import Sensor, RgbSensor, LidarSensor, DepthSensor, MountingDirection, MountingPosition
 from easycarla.sensors.world_sensor import WorldSensor
 from easycarla.sim.spawn_manager import SpawnManager, SpawnManagerConfig
+from easycarla.sim.label_manager import LabelManager
 
 logging.basicConfig(level=logging.INFO)
 
@@ -34,6 +33,7 @@ def main():
     simulation_manager = None
     spawn_manager = None
     display_manager = None
+    label_manager = None
 
     try:
         # Set seed for deterministic random
@@ -52,11 +52,6 @@ def main():
         spawn_manager = SpawnManager(simulation_manager.client, SpawnManagerConfig(seed=seed))
         spawn_manager.spawn_vehicles(num_vehicles)
         spawn_manager.spawn_pedestrians(num_pedestrians)
-
-        # Display Manager organizes all the sensors an its display in a window
-        # It is easy to configure the grid and total window size
-        # If fps is set here, the framerate will be max locked to it
-        display_manager = DisplayManager(grid_size=[1, 1], fps=fps)
 
         # Choose hero vehicle
         hero = random.choice(spawn_manager.vehicles)
@@ -80,10 +75,13 @@ def main():
             image_size=[400,400],
             sensor_options={'channels' : '64', 'range' : '200',  'points_per_second': '250000', 'rotation_frequency': '30'})
 
-        # Register sensors to be rendered
-        display_manager.add_sensor(rgb_sensor, (0, 0), ScaleMode.ZOOM_CENTER)
-        #display_manager.add_sensor(depth_sensor, (0, 2), ScaleMode.ZOOM_CENTER)
-        #display_manager.add_sensor(lidar_sensor, (0, 0), ScaleMode.SCALE_FIT)
+        # Display Manager organizes all the sensors an its display in a window
+        # It is easy to configure the grid and total window size
+        # If fps is set here, the framerate will be max locked to it
+        display_manager = DisplayManager(grid_size=[1, 3], fps=fps)
+        display_manager.add_sensor(rgb_sensor, (0, 1), ScaleMode.ZOOM_CENTER)
+        display_manager.add_sensor(depth_sensor, (0, 2), ScaleMode.ZOOM_CENTER)
+        display_manager.add_sensor(lidar_sensor, (0, 0), ScaleMode.SCALE_FIT)
 
         sensors: list[Sensor] = [
             rgb_sensor, 
@@ -91,10 +89,8 @@ def main():
             lidar_sensor, 
         ]
 
-        # Remember the edge pairs
-        edges = [[0,1], [1,3], [3,2], [2,0], 
-                 [0,4], [4,5], [5,1], [5,7], 
-                 [7,6], [6,4], [6,2], [7,3]]
+        # Create label manager for 2d and 3d bounding boxes
+        label_manager = LabelManager(simulation_manager.world, hero)
 
         def process():
             # Consume sensor data
@@ -112,42 +108,43 @@ def main():
                             hero.get_transform().location + hero.get_transform().get_forward_vector(),
                             thickness=0.1, arrow_size=0.1, color=carla.Color(255,0,0), life_time=10)
             
-            # Draw bounding boxes
-            try:
+            def draw_bbs():
                 # Vectorize hero transform
-                hero_pos = hero.get_transform().location
-                hero_pos = np.array([hero_pos.x, hero_pos.y, hero_pos.z])
-                hero_forward = hero.get_transform().get_forward_vector()
-                hero_forward = np.array([hero_forward.x, hero_forward.y, hero_forward.z])
+                sensor_pos, sensor_forward = label_manager.get_transform(rgb_sensor.sensor)
 
                 # Retrieve bounding boxes
-                bbs = world_sensor.get_bounding_boxes()
-                if len(bbs) > 0:
-                    # Filter bbs within squared distance
-                    delta_pos = (bbs[:, 0] - hero_pos)
-                    sq_dist = (delta_pos**2).sum(axis=1)
-                    bbs = bbs[sq_dist < 50**2]
-                    
-                    # Filter bbs that are in front
-                    delta_pos = (bbs[:, 0] - hero_pos)
-                    bbs = bbs[delta_pos.dot(hero_forward) > 1]
-
-                    # Project edges onto sensor
-                    bbs_proj = rgb_sensor.project(bbs.reshape((-1, 3))).astype(int)
-                    bbs_proj = bbs_proj.reshape((*bbs.shape[:-1], -1))
-
-                    # Retrieve all edges from bounding boxes
-                    bbs_proj_edges = bbs_proj[:, edges]
-
-                    # Draw edges within image boundaries
-                    image_width, image_height = rgb_sensor.image_size
-                    for bb in bbs_proj_edges:
-                        for edge in bb:
-                            p1, p2 = edge
-                            if 0 <= p1[0] < image_width and 0 <= p1[1] < image_height and \
-                                0 <= p2[0] < image_width and 0 <= p2[1] < image_height:
-                                cv2.line(rgb_sensor.decoded_data, (p1[0],p1[1]), (p2[0],p2[1]), (0,0,255), 1)
+                bbs = label_manager.get_bbs()
+                if len(bbs) == 0:
+                    return
                 
+                # Filter in 3d world space
+                bbs = label_manager.filter_bbs_distance(bbs, sensor_pos, 50)
+                if len(bbs) == 0:
+                    return
+                
+                bbs = label_manager.filter_bbs_direction(bbs, sensor_pos, sensor_forward, 0.1)
+                if len(bbs) == 0:
+                    return
+                
+                # Project edges onto sensor
+                bbs_proj = rgb_sensor.project(bbs.reshape((-1, 3))).astype(int)
+                bbs_proj = bbs_proj.reshape((*bbs.shape[:-1], -1))
+
+                # Retrieve all edges from bounding boxes
+                bbs_proj_edges = label_manager.get_bbs_edges(bbs_proj)
+
+                # Draw edges within image boundaries
+                image_width, image_height = rgb_sensor.image_size
+                for bb in bbs_proj_edges:
+                    for edge in bb:
+                        p1, p2 = edge
+                        ret, p1, p2 = cv2.clipLine((0, 0, image_width, image_height), p1.astype(int), p2.astype(int))
+                        if ret:
+                            cv2.line(rgb_sensor.decoded_data, p1, p2, (0, 0, 255), 1)
+
+            # Draw bounding boxes
+            try:
+                draw_bbs()
             except Exception as ex:
                 traceback.print_exc()
 

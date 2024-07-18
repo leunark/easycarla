@@ -37,10 +37,15 @@ class RgbSensor(Sensor):
         return img
     
     def project(self, points: np.ndarray) -> np.ndarray:
-        return self.get_image_points(
+        ps = self.get_image_points(
             points=points,
-            K=self.calibration, 
+            K=self.calibration,
             w2c=self.get_world_to_actor())
+        
+        # Filter only points within image dimension
+        #w, h = self.image_size
+        #ps = ps[0 <= ps[:, 0] < w & 0 <= ps[:, 1] < h]
+        return ps
 
     def get_calibration(self) -> np.ndarray:
         fov = self.bp.get_attribute('fov').as_float()
@@ -68,8 +73,9 @@ class RgbSensor(Sensor):
         # Project 3D->2D using the camera matrix
         points_img = np.dot(K, points_camera.T).T
         
-        # Normalize
-        points_img[:, :2] /= points_img[:, 2:3]
+        # Normalize with the absolute value of z to ensure 
+        # that the division doesn't flip the sign for points behind the camera.
+        points_img[:, :2] /= np.abs(points_img[:, 2:3])
         
         return points_img[:, :2]
     

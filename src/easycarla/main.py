@@ -8,14 +8,16 @@ import cv2
 import numpy as np
 from concurrent.futures import ThreadPoolExecutor
 from easycarla.sim.simulation_manager import SimulationManager
-from easycarla.utils.carla_helper import extract_image_rgb
 from easycarla.sim.display_manager import DisplayManager, ScaleMode
-from easycarla.sensors import Sensor, RgbSensor, LidarSensor, DepthSensor, MountingDirection, MountingPosition
+from easycarla.sensors import Sensor, CameraSensor, LidarSensor, DepthCameraSensor, MountingDirection, MountingPosition
 from easycarla.sensors.world_sensor import WorldSensor
 from easycarla.sim.spawn_manager import SpawnManager, SpawnManagerConfig
-from easycarla.sim.label_manager import LabelManager
+from easycarla.labels import LabelManager, ObjectType
 
 logging.basicConfig(level=logging.INFO)
+
+# Enable human readable numpy output for debugging
+np.set_printoptions(suppress=True)
 
 host = '127.0.0.1'
 port = 2000
@@ -58,12 +60,12 @@ def main():
         
         # Spawn sensors
         world_sensor = WorldSensor(world=simulation_manager.world)
-        rgb_sensor = RgbSensor(world=simulation_manager.world, 
+        rgb_sensor = CameraSensor(world=simulation_manager.world, 
             attached_actor=hero,
             mounting_position=MountingPosition.FRONT, 
             mounting_direction=MountingDirection.FORWARD,
             image_size=[800,600])
-        depth_sensor = DepthSensor(world=simulation_manager.world, 
+        depth_sensor = DepthCameraSensor(world=simulation_manager.world, 
             attached_actor=hero,
             mounting_position=MountingPosition.FRONT, 
             mounting_direction=MountingDirection.FORWARD,
@@ -90,7 +92,18 @@ def main():
         ]
 
         # Create label manager for 2d and 3d bounding boxes
-        label_manager = LabelManager(simulation_manager.world, hero)
+        label_manager = LabelManager(simulation_manager.world, {
+            carla.CityObjectLabel.Pedestrians,
+            carla.CityObjectLabel.Car,
+            carla.CityObjectLabel.Bus,
+            carla.CityObjectLabel.Truck,
+            carla.CityObjectLabel.Motorcycle,
+            carla.CityObjectLabel.Bicycle,
+            carla.CityObjectLabel.Rider
+        })
+        label_manager.add_sensor(rgb_sensor, is_target=True)
+        label_manager.add_sensor(depth_sensor)
+        label_manager.add_sensor(lidar_sensor)
 
         def process():
             # Consume sensor data
@@ -109,30 +122,11 @@ def main():
                             thickness=0.1, arrow_size=0.1, color=carla.Color(255,0,0), life_time=10)
             
             def draw_bbs():
-                # Vectorize hero transform
-                sensor_pos, sensor_forward = label_manager.get_transform(rgb_sensor.sensor)
-
                 # Retrieve bounding boxes
-                bbs = label_manager.get_bbs()
-                if len(bbs) == 0:
+                bbs_proj_edges = label_manager.update()
+                if bbs_proj_edges is None:
                     return
                 
-                # Filter in 3d world space
-                bbs = label_manager.filter_bbs_distance(bbs, sensor_pos, 50)
-                if len(bbs) == 0:
-                    return
-                
-                bbs = label_manager.filter_bbs_direction(bbs, sensor_pos, sensor_forward, 0.1)
-                if len(bbs) == 0:
-                    return
-                
-                # Project edges onto sensor
-                bbs_proj = rgb_sensor.project(bbs.reshape((-1, 3))).astype(int)
-                bbs_proj = bbs_proj.reshape((*bbs.shape[:-1], -1))
-
-                # Retrieve all edges from bounding boxes
-                bbs_proj_edges = label_manager.get_bbs_edges(bbs_proj)
-
                 # Draw edges within image boundaries
                 image_width, image_height = rgb_sensor.image_size
                 for bb in bbs_proj_edges:

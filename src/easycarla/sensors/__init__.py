@@ -1,4 +1,4 @@
 from easycarla.sensors.sensor import Sensor, MountingDirection, MountingPosition
-from easycarla.sensors.rgb_sensor import RgbSensor
-from easycarla.sensors.depth_sensor import DepthSensor
+from easycarla.sensors.camera_sensor import CameraSensor
+from easycarla.sensors.depth_camera_sensor import DepthCameraSensor
 from easycarla.sensors.lidar_sensor import LidarSensor

@@ -5,9 +5,6 @@ import carla
 from pathlib import Path
 from dataclasses import dataclass, field
 
-from easycarla.utils.carla_helper import get_actor_blueprints
-from easycarla.utils.algorithm import select_percentage_threshold
-
 
 @dataclass
 class SpawnManagerConfig:

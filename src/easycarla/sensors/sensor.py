@@ -9,6 +9,7 @@ import pygame
 import cv2
 import logging
 
+from easycarla.tf import Transformation
 
 class MountingPosition(Enum):
     TOP = 1
@@ -33,7 +34,7 @@ class Sensor(ABC):
 
     q: queue.Queue
     bp: carla.ActorBlueprint
-    sensor: carla.Actor
+    actor: carla.Actor
 
     sensor_data: carla.SensorData = None
     decoded_data: np.ndarray = None
@@ -59,8 +60,8 @@ class Sensor(ABC):
         for key in self.sensor_options:
             self.bp.set_attribute(key, self.sensor_options[key])
 
-        self.sensor = self.world.spawn_actor(self.bp, self.transform, attach_to=self.attached_actor)
-        self.sensor.listen(self.produce)
+        self.actor = self.world.spawn_actor(self.bp, self.transform, attach_to=self.attached_actor)
+        self.actor.listen(self.produce)
 
     @abstractmethod
     def create_blueprint(self) -> carla.ActorBlueprint:
@@ -104,12 +105,20 @@ class Sensor(ABC):
         return self.queue.queue[0]
 
     def destroy(self):
-        if self.sensor:
-            self.sensor.stop()
-            self.sensor.destroy()
+        if self.actor:
+            self.actor.stop()
+            self.actor.destroy()
 
-    def get_world_to_actor(self):
-        return np.array(self.sensor.get_transform().get_inverse_matrix())
+    def world_to_sensor(self, points: np.ndarray) -> np.ndarray:
+        return Transformation.transform_with_matrix(
+            points=points,
+            w2s=self.get_world_to_actor())
+    
+    def get_world_to_actor(self) -> np.ndarray:
+        return np.array(self.actor.get_transform().get_inverse_matrix())
+
+    def get_actor_to_world(self) -> np.ndarray:
+        return np.array(self.actor.get_transform().get_matrix())
 
     def get_mounting_transform(self, 
                               mounting_position: MountingPosition, 

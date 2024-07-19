@@ -1,9 +1,9 @@
 import carla
 import numpy as np
 
-from easycarla.sensors.rgb_sensor import RgbSensor, MountingDirection, MountingPosition
+from easycarla.sensors.camera_sensor import CameraSensor, MountingDirection, MountingPosition
 
-class DepthSensor(RgbSensor):
+class DepthCameraSensor(CameraSensor):
 
     def create_blueprint(self) -> carla.ActorBlueprint:
         bp = self.world.get_blueprint_library().find('sensor.camera.depth')

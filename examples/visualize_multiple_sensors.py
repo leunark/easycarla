@@ -262,7 +262,7 @@ def run_simulation(args, client):
     """
 
     ## MY SETTINGS
-    args.sync = True
+    args.sync = False
     
 
     display_manager = None
@@ -296,7 +296,7 @@ def run_simulation(args, client):
         display_manager = DisplayManager(grid_size=[2, 3], window_size=[args.width, args.height])
 
         # Then, SensorManager can be used to spawn RGBCamera, LiDARs and SemanticLiDARs as needed
-        # and assign each of them to a grid position, 
+        # and assign each of them to a grid position,
         SensorManager(world, display_manager, SensorType.CAMERA_RGB, carla.Transform(carla.Location(x=0, z=2.4), carla.Rotation(yaw=-90)), 
                       vehicle, {}, display_pos=[0, 0])
         SensorManager(world, display_manager, SensorType.CAMERA_RGB, carla.Transform(carla.Location(x=0, z=2.4), carla.Rotation(yaw=+00)), 
@@ -314,7 +314,6 @@ def run_simulation(args, client):
 
         #Simulation loop
         call_exit = False
-        time_init_sim = timer.time()
         while True:
             # Carla Tick
             if args.sync:

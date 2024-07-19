@@ -1,9 +1,5 @@
 import carla
-from pathlib import Path
-import numpy as np
 from concurrent.futures import ThreadPoolExecutor
-from easycarla.sim.carla_sync_mode import CarlaSyncMode
-from easycarla.sim.process_data import process_data
 
 class SimulationManager:
     def __init__(self, host='127.0.0.1', port=2000, timeout=40, fixed_delta_seconds=0.05, map_name: str = "Town10HD_Opt", sync: bool = False, reset=False, no_rendering=False):

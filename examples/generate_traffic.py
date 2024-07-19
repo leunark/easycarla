@@ -59,13 +59,13 @@ def main():
     argparser.add_argument(
         '-n', '--number-of-vehicles',
         metavar='N',
-        default=30,
+        default=100,
         type=int,
         help='Number of vehicles (default: 30)')
     argparser.add_argument(
         '-w', '--number-of-walkers',
         metavar='W',
-        default=10,
+        default=40,
         type=int,
         help='Number of walkers (default: 10)')
     argparser.add_argument(
@@ -139,7 +139,7 @@ def main():
         help='Activate no rendering mode')
 
     args = argparser.parse_args()
-
+    
     ## MY SETTINgS
     args.synch = True
 

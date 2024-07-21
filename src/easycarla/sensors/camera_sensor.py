@@ -19,7 +19,6 @@ class CameraSensor(Sensor):
                  max_queue_size: int = 100):
         super().__init__(world, attached_actor, mounting_position, mounting_direction, image_size, sensor_options, max_queue_size)
         self.calibration = self.get_calibration()
-        self.image_data = None
 
     def create_blueprint(self) -> carla.ActorBlueprint:
         bp = self.world.get_blueprint_library().find('sensor.camera.rgb')
@@ -27,16 +26,16 @@ class CameraSensor(Sensor):
         bp.set_attribute('image_size_y', str(self.image_size[1]))
         return bp
 
-    def decode(self, data: carla.SensorData):
+    def decode(self, data: carla.SensorData) -> np.ndarray:
         array = np.frombuffer(data.raw_data, dtype=np.dtype("uint8"))
         array = np.reshape(array, (data.height, data.width, 4))
         array = array[:, :, :3]
         array = array[:, :, ::-1]
-        return array.copy()
+        self.decoded_data = array.copy()
+        return self.decoded_data
 
     def to_img(self) -> np.ndarray:
-        img = self.decoded_data.swapaxes(0, 1)
-        return img
+        return self.decoded_data.swapaxes(0, 1)
 
     def project(self, points: np.ndarray) -> np.ndarray:
         return Projection.project_to_camera(

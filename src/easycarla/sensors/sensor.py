@@ -38,8 +38,6 @@ class Sensor(ABC):
 
     sensor_data: carla.SensorData = None
     decoded_data: np.ndarray = None
-    image: np.ndarray = None
-
 
     def __init__(self, 
                  world: carla.World, 
@@ -72,7 +70,7 @@ class Sensor(ABC):
         ...
 
     @abstractmethod
-    def decode(self, data: carla.SensorData):
+    def decode(self, data: carla.SensorData) -> np.ndarray:
         ...
     
     def save(self, output_folder: Path):
@@ -161,3 +159,12 @@ class Sensor(ABC):
         
         mount_transform = carla.Transform(mount_location, mount_rotation)
         return mount_transform
+
+    def get_transform(self) -> tuple[np.ndarray, np.ndarray]:
+        "Returns postion and direction vector as numpy arrays in world"
+        pos = self.actor.get_transform().location
+        pos = np.array([pos.x, pos.y, pos.z])
+        forward = self.actor.get_transform().get_forward_vector()
+        forward = np.array([forward.x, forward.y, forward.z])
+        return pos, forward
+    

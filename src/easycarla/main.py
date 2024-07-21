@@ -9,7 +9,7 @@ import numpy as np
 from concurrent.futures import ThreadPoolExecutor
 from easycarla.sim.simulation_manager import SimulationManager
 from easycarla.sim.display_manager import DisplayManager, ScaleMode
-from easycarla.sensors import Sensor, CameraSensor, LidarSensor, DepthCameraSensor, MountingDirection, MountingPosition
+from easycarla.sensors import Sensor, CameraSensor, LidarSensor, DepthCameraSensor, InsegCameraSensor, MountingDirection, MountingPosition
 from easycarla.sensors.world_sensor import WorldSensor
 from easycarla.sim.spawn_manager import SpawnManager, SpawnManagerConfig
 from easycarla.labels import LabelManager, ObjectType
@@ -29,7 +29,7 @@ timeout=0.01
 num_vehicles = 30
 num_pedestrians = 40
 seed = 123
-reset = False
+reset = True
 
 def main():
     simulation_manager = None
@@ -70,25 +70,32 @@ def main():
             mounting_position=MountingPosition.FRONT, 
             mounting_direction=MountingDirection.FORWARD,
             image_size=[800,600])
+        inseg_sensor = InsegCameraSensor(world=simulation_manager.world, 
+            attached_actor=hero,
+            mounting_position=MountingPosition.FRONT, 
+            mounting_direction=MountingDirection.FORWARD,
+            image_size=[800,600])
         lidar_sensor = LidarSensor(world=simulation_manager.world, 
             attached_actor=hero,
             mounting_position=MountingPosition.TOP, 
             mounting_direction=MountingDirection.FORWARD,
             image_size=[400,400],
             sensor_options={'channels' : '64', 'range' : '200',  'points_per_second': '250000', 'rotation_frequency': '30'})
-
+    
         # Display Manager organizes all the sensors an its display in a window
         # It is easy to configure the grid and total window size
         # If fps is set here, the framerate will be max locked to it
-        display_manager = DisplayManager(grid_size=[1, 3], fps=fps)
+        display_manager = DisplayManager(grid_size=[1, 4], fps=fps)
+        display_manager.add_sensor(lidar_sensor, (0, 0), ScaleMode.SCALE_FIT)
         display_manager.add_sensor(rgb_sensor, (0, 1), ScaleMode.ZOOM_CENTER)
         display_manager.add_sensor(depth_sensor, (0, 2), ScaleMode.ZOOM_CENTER)
-        display_manager.add_sensor(lidar_sensor, (0, 0), ScaleMode.SCALE_FIT)
+        display_manager.add_sensor(inseg_sensor, (0, 3), ScaleMode.ZOOM_CENTER)
 
         sensors: list[Sensor] = [
             rgb_sensor, 
             depth_sensor,
-            lidar_sensor, 
+            inseg_sensor,
+            lidar_sensor,
         ]
 
         # Create label manager for 2d and 3d bounding boxes
@@ -103,10 +110,11 @@ def main():
         })
         label_manager.add_sensor(rgb_sensor, is_target=True)
         label_manager.add_sensor(depth_sensor)
+        label_manager.add_sensor(inseg_sensor)
         label_manager.add_sensor(lidar_sensor)
 
         def process():
-            # Consume sensor data
+            # Consume first sensors, so all data is available after for the same frame
             try:
                 world_sensor.consume()
                 world_snapshot = world_sensor.sensor_data
@@ -153,7 +161,6 @@ def main():
             
             with ThreadPoolExecutor() as executor:
                 future = executor.submit(process)
-            #process(world_sensor, sensors, display_manager)
 
             # Must listen to events to prevent unresponsive window
             if display_manager.should_quit():

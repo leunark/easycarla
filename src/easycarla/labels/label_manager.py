@@ -75,7 +75,7 @@ class LabelManager:
             return
         
         # Vectorize hero transform
-        sensor_pos, sensor_forward = self.get_transform(self.target_sensor.actor)
+        sensor_pos, sensor_forward = self.target_sensor.get_transform()
 
         # Filter in 3d world space
         labels.filter_by_distance(sensor_pos, 50)
@@ -87,16 +87,28 @@ class LabelManager:
             return None
         
         # Transform to sensor coordinate system
-        labels.bbox_3d = self.target_sensor.world_to_sensor(labels.bbox_3d)
+        labels.transform = self.target_sensor.world_to_sensor(labels.transform)
 
         # Project edges onto sensor 
-        bbs = self.target_sensor.project(labels.bbox_3d)
+        bbs = self.target_sensor.project(labels.transform)
 
         # Retrieve all edges from bounding boxes
         bbs = self.get_bbs_edges(bbs)
 
-        # Transform into target sensor space
         return bbs
+
+    def create_labels(self, label_objects: list[carla.EnvironmentObject | carla.Actor]) -> LabelData: 
+        for label_object in label_objects:
+            location = label_object.transform.location
+            location = location.x, location.y, location.z
+            rotation = label_object.transform.rotation
+            rotation = rotation.x, rotation.y, rotation.z
+            extent = label_object.bounding_box.extent
+            extent = extent.x, extent.y, extent.z
+
+
+            
+        
 
     def get_env_bbs(self) -> LabelData:
         bbox_3d = []
@@ -112,7 +124,7 @@ class LabelManager:
             object_type = map_carla_to_kitti(env_object.type)
             object_types.append({object_type})
         bbox_3d = np.array(bbox_3d)
-        return LabelData(object_types=object_types, bbox_3d=bbox_3d)
+        return LabelData(object_types=object_types, transform=bbox_3d)
 
     def get_actor_bbs(self) -> np.ndarray:
         bbox_3d = []
@@ -127,7 +139,7 @@ class LabelManager:
             tags = {map_carla_to_kitti(tag) for tag in actor.semantic_tags}
             object_types.append(tags)
         bbox_3d = np.array(bbox_3d)
-        return LabelData(object_types=object_types, bbox_3d=bbox_3d)
+        return LabelData(object_types=object_types, transform=bbox_3d)
     
     @staticmethod
     def get_bbs_edges(bbs: np.ndarray):
@@ -136,13 +148,3 @@ class LabelManager:
                  [0,4], [4,5], [5,1], [5,7], 
                  [7,6], [6,4], [6,2], [7,3]]
         return bbs[:, edges]
-
-    @staticmethod
-    def get_transform(actor: carla.Actor) -> tuple[np.ndarray, np.ndarray]:
-        "Returns postion and direction vector as numpy arrays in world"
-        pos = actor.get_transform().location
-        pos = np.array([pos.x, pos.y, pos.z])
-        forward = actor.get_transform().get_forward_vector()
-        forward = np.array([forward.x, forward.y, forward.z])
-        return pos, forward
-    

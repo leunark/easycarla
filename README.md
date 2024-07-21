@@ -36,7 +36,7 @@ Ensure your system meets the following requirements:
     - Install [Miniconda](https://docs.conda.io/en/latest/miniconda.html) or [Anaconda](https://www.anaconda.com/products/distribution) if you don't have it installed.
     - Create a new conda environment:
         ```shell
-        conda create --name carla-env python=3.7
+        conda create --name carla-env python=3.10
         ```
     - Activate the conda environment:
         ```shell
@@ -44,7 +44,7 @@ Ensure your system meets the following requirements:
         ```
 
 3. **Install this package**:
-    - Install carla package:
+    - Install carla package in development mode:
         ```shell
         pip install -e .
         ```
@@ -54,12 +54,12 @@ Ensure your system meets the following requirements:
    - Open a Command Prompt.
    - Run `CarlaUE4.exe` to start the simulator:
      ```shell
-     path\to\Carla\WindowsNoEditor\CarlaUE4.ex
+     .\CarlaUE4.exe
      ```
-     ***Note: Carla can be run in headless mode with `CarlaUE4.exe -RenderOffScreen`***
+     ***Note: Carla can be run in headless mode with `.\CarlaUE4.exe -RenderOffScreen`***
 
 2. **Start Client**:
-    - Run `CarlaUE4.exe` with the `-RenderOffScreen` flag to start the simulator:
+    - Run the main script to setup the client:
      ```shell
      python src/easycarla/main.py
      ```

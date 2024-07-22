@@ -37,7 +37,6 @@ class Sensor(ABC):
     actor: carla.Actor
 
     sensor_data: carla.SensorData = None
-    decoded_data: np.ndarray = None
 
     def __init__(self, 
                  world: carla.World, 
@@ -60,7 +59,7 @@ class Sensor(ABC):
 
         self.actor = self.world.spawn_actor(self.bp, self.transform, attach_to=self.attached_actor)
         self.actor.listen(self.produce)
-
+    
     @abstractmethod
     def create_blueprint(self) -> carla.ActorBlueprint:
         ...
@@ -70,7 +69,7 @@ class Sensor(ABC):
         ...
 
     @abstractmethod
-    def decode(self, data: carla.SensorData) -> np.ndarray:
+    def decode(self, data: carla.SensorData) -> None:
         ...
     
     def save(self, output_folder: Path):
@@ -90,7 +89,7 @@ class Sensor(ABC):
             data = self.q.get(block=True, timeout=timeout)
             if data.frame >= frame:
                 self.sensor_data = data
-                self.decoded_data = self.decode(data)
+                self.decode(data)
                 break
 
     def render(self):

@@ -80,8 +80,8 @@ class DisplayManager:
 
     def draw_sensors(self):
         for sensor, display_pos, scale_mode in self.sensors:
-            if sensor.decoded_data is not None:
-                img = sensor.to_img()
+            img = sensor.to_img()
+            if img is not None:
                 surface = pygame.surfarray.make_surface(img)
                 self.draw_surface(surface, display_pos, scale_mode)
 

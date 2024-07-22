@@ -75,15 +75,21 @@ def main():
             mounting_position=MountingPosition.TOP, 
             mounting_direction=MountingDirection.FORWARD,
             image_size=[400,400],
-            sensor_options={'channels' : '64', 'range' : '200',  'points_per_second': '250000', 'rotation_frequency': '30'})
+            sensor_options={
+                'channels' : '64', 
+                'range' : '120',  
+                'points_per_second': '1300000', 
+                'rotation_frequency': str(fps),
+                'sensor_tick': '0',
+                })
     
         # Display Manager organizes all the sensors an its display in a window
         # It is easy to configure the grid and total window size
         # If fps is set here, the framerate will be max locked to it
-        display_manager = DisplayManager(grid_size=[1, 3], fps=fps)
+        display_manager = DisplayManager(grid_size=[1, 2], fps=fps)
         display_manager.add_sensor(lidar_sensor, (0, 0), ScaleMode.SCALE_FIT)
-        display_manager.add_sensor(rgb_sensor, (0, 1), ScaleMode.ZOOM_CENTER)
-        display_manager.add_sensor(depth_sensor, (0, 2), ScaleMode.ZOOM_CENTER)
+        display_manager.add_sensor(rgb_sensor, (0, 1), ScaleMode.SCALE_FIT)
+        #display_manager.add_sensor(depth_sensor, (0, 2), ScaleMode.ZOOM_CENTER)
 
         sensors: list[Sensor] = [
             rgb_sensor, 
@@ -131,7 +137,7 @@ def main():
                         p1, p2 = edge
                         ret, p1, p2 = cv2.clipLine((0, 0, image_width, image_height), p1.astype(int), p2.astype(int))
                         if ret:
-                            cv2.line(rgb_sensor.decoded_data, p1, p2, (0, 0, 255), 1)
+                            cv2.line(rgb_sensor.rgb_image, p1, p2, (0, 0, 255), 1)
 
             # Draw bounding boxes
             try:

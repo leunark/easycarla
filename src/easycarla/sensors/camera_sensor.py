@@ -19,6 +19,7 @@ class CameraSensor(Sensor):
                  max_queue_size: int = 100):
         super().__init__(world, attached_actor, mounting_position, mounting_direction, image_size, sensor_options, max_queue_size)
         self.calibration = self.get_calibration()
+        self.rgb_image = None
 
     def create_blueprint(self) -> carla.ActorBlueprint:
         bp = self.world.get_blueprint_library().find('sensor.camera.rgb')
@@ -26,16 +27,22 @@ class CameraSensor(Sensor):
         bp.set_attribute('image_size_y', str(self.image_size[1]))
         return bp
 
-    def decode(self, data: carla.SensorData) -> np.ndarray:
-        array = np.frombuffer(data.raw_data, dtype=np.dtype("uint8"))
-        array = np.reshape(array, (data.height, data.width, 4))
-        array = array[:, :, :3]
-        array = array[:, :, ::-1]
-        self.decoded_data = array.copy()
-        return self.decoded_data
+    def decode(self, data: carla.SensorData) -> None:
+        # Convert the image raw data to a numpy array
+        image_data = np.frombuffer(data.raw_data, dtype=np.uint8)
+        
+        # Reshape array into (height, width, 4) where the last dimension is RGBA
+        image_data = np.reshape(image_data, (data.height, data.width, 4))
+        
+        # Extract the R, G, and B channels (ignore A)
+        image_data = image_data[:, :, :3]
+        image_data = image_data[:, :, ::-1]
+
+        # Due to being called from thread, mandatory to create a copy
+        self.rgb_image = image_data.copy()
 
     def to_img(self) -> np.ndarray:
-        return self.decoded_data.swapaxes(0, 1)
+        return self.rgb_image.swapaxes(0, 1)
 
     def project(self, points: np.ndarray) -> np.ndarray:
         return Projection.project_to_camera(

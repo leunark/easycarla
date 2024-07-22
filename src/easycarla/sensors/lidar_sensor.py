@@ -14,6 +14,8 @@ class LidarSensor(Sensor):
                  sensor_options: dict = {}, 
                  max_queue_size: int = 100):
         super().__init__(world, attached_actor, mounting_position, mounting_direction, image_size, sensor_options, max_queue_size)
+        self.range = float(self.bp.get_attribute('range'))
+        self.points = None
 
     def create_blueprint(self) -> carla.ActorBlueprint:
         bp = self.world.get_blueprint_library().find('sensor.lidar.ray_cast')
@@ -23,15 +25,15 @@ class LidarSensor(Sensor):
         bp.set_attribute('dropoff_zero_intensity', bp.get_attribute('dropoff_zero_intensity').recommended_values[0])
         return bp
 
-    def decode(self, data: carla.LidarMeasurement):
+    def decode(self, data: carla.LidarMeasurement) -> None:
         points = np.frombuffer(data.raw_data, dtype=np.dtype('f4'))
         points = np.reshape(points, (int(points.shape[0] / 4), 4))
-        return points
+        self.points = points
 
     def to_img(self) -> np.ndarray:
         # Take xy plane and scale to display size
         disp_size = self.image_size
-        points = self.decoded_data
+        points = self.points
         lidar_range = 2.0*float(self.sensor_options['range'])
         lidar_data = np.array(points[:, :2])
         lidar_data *= min(disp_size) / lidar_range

@@ -1,7 +1,6 @@
 from dataclasses import dataclass
 import numpy as np
 from scipy.spatial.transform import Rotation
-from typing import Union
 from easycarla.labels.label_types import ObjectType
 
 @dataclass
@@ -22,11 +21,32 @@ class LabelData:
         [0, 4], [1, 5], [2, 6], [3, 7]   # Connecting edges
     ])
 
+    # Define diagonals of the side faces
+    DIAG_INDICES = np.array([
+        [0, 5], [0, 7],
+        [1, 6], [1, 4],
+        [2, 7], [2, 5],
+        [3, 4], [3, 6],
+    ])
+
+    # Define the 8 vertices of a unit cube
+    UNIT_BOX = np.array([
+        [-0.5, -0.5, -0.5],
+        [0.5, -0.5, -0.5],
+        [0.5, 0.5, -0.5],
+        [-0.5, 0.5, -0.5],
+        [-0.5, -0.5, 0.5],
+        [0.5, -0.5, 0.5],
+        [0.5, 0.5, 0.5],
+        [-0.5, 0.5, 0.5]
+    ])
+
     # Add extra vertices along each edge to improve occlusion calculation
     # A subdivsion count of two adds one extra vertex because it subdivides
     # the edge into two parts
-    SUBDIVISION_COUNT = 2
+    SUBDIVISION_COUNT = 3
 
+    
     @property
     def position(self) -> np.ndarray:
         return self.transform[:, :3, 3]
@@ -37,27 +57,17 @@ class LabelData:
 
     @property
     def vertices(self) -> np.ndarray:
-        # Define the 8 vertices of a unit cube
-        unit_box = np.array([
-            [-0.5, -0.5, -0.5],
-            [0.5, -0.5, -0.5],
-            [0.5, 0.5, -0.5],
-            [-0.5, 0.5, -0.5],
-            [-0.5, -0.5, 0.5],
-            [0.5, -0.5, 0.5],
-            [0.5, 0.5, 0.5],
-            [-0.5, 0.5, 0.5]
-        ])
-
-        # Add subdivision vertices
+        # Add extra verts on diagonals
+        unit_box = self.UNIT_BOX
         exra_verts = []
-        for i, j in self.EDGE_INDICES:
+        lines = self.DIAG_INDICES
+        for i, j in lines:
             for k in range(1, self.SUBDIVISION_COUNT):
                 v = unit_box[i] + (unit_box[j] - unit_box[i]) / self.SUBDIVISION_COUNT * k
                 exra_verts.append(v)
         exra_verts = np.array(exra_verts)
         unit_box = np.vstack((unit_box, exra_verts))
-        
+
         # Scale the unit box by the dimensions
         # unit_box: Broadcasting across multiple objects
         # dimension: Broadcasting across the 8 vertices of each box

@@ -2,12 +2,12 @@ import carla
 import numpy as np
 import logging
 from dataclasses import dataclass
+import cv2 
 
 from easycarla.sensors import Sensor, CameraSensor, DepthCameraSensor, LidarSensor, InsegCameraSensor
-from easycarla.labels.label_data import LabelData
-from easycarla.labels.label_types import ObjectType, map_carla_to_kitti, map_kitti_to_carla
-from easycarla.labels.calibration_data import CalibrationData
-
+from easycarla.labels.label_data import LabelData, ObjectType
+from easycarla.labels.label_types import map_carla_to_kitti, map_kitti_to_carla
+from easycarla.tf import Transformation
 
 class LabelManager:
 
@@ -93,7 +93,6 @@ class LabelManager:
             return
         
         # Vectorize hero transform
-        camera_pos, camera_forward = self.camera_sensor.get_transform()
         lidar_pos, lidar_forward = self.lidar_sensor.get_transform()
 
         # Filter objects in distance of lidar
@@ -101,19 +100,14 @@ class LabelManager:
         if len(labels) == 0:
             return None
 
-        # Filter bbx with at least one point
-        # ...
-
         # Transform to sensor coordinate system
         world_to_camera = self.camera_sensor.get_world_to_actor()
         labels.apply_transform(world_to_camera)
-        
-        # Set alpha in camera space
-        labels.alpha = labels.get_alpha()
 
         # Project edges onto sensor
-        num_of_vertices = labels.vertices.shape[1]
-        bbs_pos, bbs_depth = self.camera_sensor.project(labels.vertices)
+        vertices = labels.vertices
+        num_of_vertices = vertices.shape[1]
+        bbs_pos, bbs_depth = self.camera_sensor.project(vertices)
 
         # Calculate truncation
         mask_within_image = (bbs_pos[:, :, 0] >= 0) & (bbs_pos[:, :, 0] < self.camera_sensor.image_size[0]) & \
@@ -133,42 +127,33 @@ class LabelManager:
         num_of_verts_occluded = np.count_nonzero(bbs_verts_occluded, axis=1)
         labels.occlusion = num_of_verts_occluded / num_of_vertices
 
+        # Calculate alpha in camera space
+        labels.alpha = labels.get_alpha()
+
+        # Filter bbx with at least one point
+        pointcloud = self.lidar_sensor.pointcloud
+        points = pointcloud[:, :3]
+        lidar_to_world = self.lidar_sensor.get_actor_to_world()
+        lidar_to_camera = world_to_camera @ lidar_to_world
+        points = Transformation.transform_with_matrix(points, lidar_to_camera)
+        points_proj, points_depth = self.camera_sensor.project(points)
+        
+        # Draw the points that are in the image
+        mask_within_image = (points_proj[:, 0] >= 0) & (points_proj[:, 0] < self.camera_sensor.image_size[0]) & \
+                            (points_proj[:, 1] >= 0) & (points_proj[:, 1] < self.camera_sensor.image_size[1]) & \
+                            (points_depth > 0)
+        points_proj = points_proj[mask_within_image]
+        for point in points_proj:
+            cv2.circle(self.camera_sensor.rgb_image, point, 1, (200, 200, 200), 1)
+
         # Filter based on truncation
         mask_truncation_threshold = labels.truncation < 0.9
-        mask_occlusion_threshold = labels.occlusion < 0.8
+        mask_occlusion_threshold = labels.occlusion < 0.9
         mask = mask_truncation_threshold & mask_occlusion_threshold
         bbs_depth = bbs_depth[mask]
         bbs_pos = bbs_pos[mask]
 
         # Retrieve all edges from bounding boxes
         bbs_pos = bbs_pos[:, labels.EDGE_INDICES]
-
-        return bbs_pos
-
-    @staticmethod
-    def get_depth_at_point(depth_image_array, point):
-        """Retrieve depth value at the specified point from the depth image array."""
-        x, y = int(point[0, 0]), int(point[0, 1])
         
-        if 0 <= x < depth_image_array.shape[1] and 0 <= y < depth_image_array.shape[0]:
-            # Convert the depth image value to meters
-            depth_value = int(depth_image_array[y, x][0]) + int(depth_image_array[y, x][1]) * 256 + int(depth_image_array[y, x][2]) * 256 * 256
-            normalized_depth = depth_value / (256 ** 3 - 1)  # Normalize to range [0, 1]
-            depth_in_meters = normalized_depth * 1000.0  # Assuming 0-1 maps to 0-1000 meters
-            
-            return depth_in_meters
-        return None
-
-    @staticmethod
-    def is_occluded(bounding_box, depth_image_array):
-        """Determine if the bounding box is occluded based on depth image array."""
-        num_occluded_points = 0
-        for point in bounding_box:
-            x, y, depth = int(point[0, 0]), int(point[0, 1]), point[0, 2]
-            depth_at_point = depth_image_array[y, x]
-            if depth >= depth_at_point + 0.1:
-                num_occluded_points += 1
-        if num_occluded_points > 6:
-            return True
-        return False
-    
+        return bbs_pos

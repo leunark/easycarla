@@ -68,6 +68,48 @@ class DisplayManager:
 
         return True        
 
+    def draw_image(self, image: np.ndarray, blend: bool = False) -> None:
+        """Draw an rgb image on the Pygame surface. Input is of dimension h x w x rgb"""
+        image_surface = pygame.surfarray.make_surface(image.swapaxes(0, 1))
+        if blend:
+            image_surface.set_alpha(100)
+        self.display.blit(image_surface, (0, 0))
+
+    @staticmethod
+    def get_font() -> pygame.font.Font:
+        """Get the default font for Pygame."""
+        fonts = [x for x in pygame.font.get_fonts()]
+        default_font = 'ubuntumono'
+        font = default_font if default_font in fonts else fonts[0]
+        font = pygame.font.match_font(font)
+        return pygame.font.Font(font, 14)
+
+    @staticmethod
+    def should_quit() -> bool:
+        """Check if the Pygame window should close."""
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                return True
+            elif event.type == pygame.KEYUP:
+                if event.key == pygame.K_ESCAPE:
+                    return True
+        return False
+    
+    def draw_points(self, points: np.ndarray):
+        """
+        Draw points onto the display.
+
+        :param points: A numpy array of shape (n, 2), where n is the number of points.
+                    Each point is represented as (x, y).
+        """
+        # Ensure the points array is two-dimensional and each point has two coordinates
+        if points.ndim != 2 or points.shape[1] != 2:
+            raise ValueError("Points array must be of shape (n, 2)")
+
+        for point in points:
+            x, y = point
+            pygame.draw.circle(self.display, (255, 255, 255), (int(x), int(y)), 2)
+
     def draw_fps(self, delta_seconds: int):
         fps_simulated = round(1.0 / delta_seconds)
         fps_real = self.clock.get_fps()
@@ -113,33 +155,6 @@ class DisplayManager:
             pygame.draw.line(bb_surface, bb_color, points[3], points[7])
         self.display.blit(bb_surface, (0, 0))
 
-    def draw_image(self, image: np.ndarray, blend: bool = False) -> None:
-        """Draw an rgb image on the Pygame surface. Input is of dimension h x w x rgb"""
-        image_surface = pygame.surfarray.make_surface(image.swapaxes(0, 1))
-        if blend:
-            image_surface.set_alpha(100)
-        self.display.blit(image_surface, (0, 0))
-
-    @staticmethod
-    def get_font() -> pygame.font.Font:
-        """Get the default font for Pygame."""
-        fonts = [x for x in pygame.font.get_fonts()]
-        default_font = 'ubuntumono'
-        font = default_font if default_font in fonts else fonts[0]
-        font = pygame.font.match_font(font)
-        return pygame.font.Font(font, 14)
-
-    @staticmethod
-    def should_quit() -> bool:
-        """Check if the Pygame window should close."""
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                return True
-            elif event.type == pygame.KEYUP:
-                if event.key == pygame.K_ESCAPE:
-                    return True
-        return False
-    
     def draw_surface(self, surface: pygame.Surface, display_pos: tuple[int, int], scale_mode: ScaleMode):
         display_offset = self.get_display_offset(display_pos)
         display_size = self.get_display_size()

@@ -75,13 +75,17 @@ def main():
             mounting_position=MountingPosition.TOP, 
             mounting_direction=MountingDirection.FORWARD,
             image_size=[400,400],
+            # Sensor tick of 0 will let the sensor create a scan for every world tick.
+            # Combined with rotation frequency be the same as the simulation tick frequency
+            # gives us one full rotation of the point cloud for every tick.
+            # Other settings are similar to kitti velodyne sensors.
             sensor_options={
                 'channels' : '64', 
                 'range' : '120',  
                 'points_per_second': '1300000', 
-                'rotation_frequency': str(fps),
+                'rotation_frequency': str(1/fixed_delta_seconds), 
                 'sensor_tick': '0',
-                })
+            })
     
         # Display Manager organizes all the sensors an its display in a window
         # It is easy to configure the grid and total window size
@@ -129,7 +133,7 @@ def main():
                 bbs_proj_edges = label_manager.update()
                 if bbs_proj_edges is None:
                     return
-                
+
                 # Draw edges within image boundaries
                 image_width, image_height = rgb_sensor.image_size
                 for bb in bbs_proj_edges:

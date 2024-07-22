@@ -44,7 +44,7 @@ class CameraSensor(Sensor):
     def to_img(self) -> np.ndarray:
         return self.rgb_image.swapaxes(0, 1)
 
-    def project(self, points: np.ndarray) -> np.ndarray:
+    def project(self, points: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
         return Projection.project_to_camera(
             points=points,
             K=self.calibration)

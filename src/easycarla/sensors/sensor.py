@@ -110,7 +110,7 @@ class Sensor(ABC):
     def world_to_sensor(self, points: np.ndarray) -> np.ndarray:
         return Transformation.transform_with_matrix(
             points=points,
-            w2s=self.get_world_to_actor())
+            matrix=self.get_world_to_actor())
     
     def get_world_to_actor(self) -> np.ndarray:
         return np.array(self.actor.get_transform().get_inverse_matrix())

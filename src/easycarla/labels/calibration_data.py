@@ -11,6 +11,17 @@ class CalibrationData:
         camera_extrinsics (np.ndarray): Camera extrinsic parameters matrix.
         lidar_to_camera (np.ndarray): Transformation matrix from LiDAR to camera coordinates.
     """
-    camera_intrinsics: np.ndarray
-    camera_extrinsics: np.ndarray
-    lidar_to_camera: np.ndarray
+    extrinsics: np.ndarray
+    intrinsics: np.ndarray = None
+
+    @property
+    def K(self):
+        return self.camera_intrinsics
+    
+    @property
+    def R(self):
+        return self.camera_extrinsics[:3, :3]
+    
+    @property
+    def T(self):
+        return self.camera_intrinsics[:3, 3]

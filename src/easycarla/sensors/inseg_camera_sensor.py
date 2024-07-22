@@ -18,9 +18,9 @@ class InsegCameraSensor(CameraSensor):
         self.cache_data = decoded_data
         # Instance IDs are encoded in the G and B channels of the RGB image file
         # The R channel contains the standard semantic ID
-        instance_ids = decoded_data[:, :, 0] + decoded_data[:, :, 1] * 255
-        semantic_ids = decoded_data[:, :, 2]
-        return instance_ids, semantic_ids
+        semantic_ids = decoded_data[:, :, 0]
+        instance_ids = decoded_data[:, :, 1].astype(int) * 255 + decoded_data[:, :, 2].astype(int)
+        return np.concatenate((semantic_ids[:, :, None], instance_ids[:, :, None]), axis=2)
     
     def to_img(self) -> np.ndarray:
         return self.cache_data.swapaxes(0, 1)

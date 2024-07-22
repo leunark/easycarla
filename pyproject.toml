@@ -26,6 +26,7 @@ Shapely = "*"
 open3d = "*"
 matplotlib = "*"
 opencv-python = "*"
+scipy = "*"
 
 [tool.poetry.dev-dependencies]
 black = "^23.0"

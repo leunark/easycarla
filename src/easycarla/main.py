@@ -86,6 +86,9 @@ def main():
                 'rotation_frequency': str(1/fixed_delta_seconds), 
                 'sensor_tick': '0',
             })
+        
+        # Make sure to tick after sensors are created, so they are immediately available
+        simulation_manager.tick()
     
         # Display Manager organizes all the sensors an its display in a window
         # It is easy to configure the grid and total window size
@@ -141,7 +144,7 @@ def main():
                         p1, p2 = edge
                         ret, p1, p2 = cv2.clipLine((0, 0, image_width, image_height), p1.astype(int), p2.astype(int))
                         if ret:
-                            cv2.line(rgb_sensor.rgb_image, p1, p2, (0, 0, 255), 1)
+                            cv2.line(rgb_sensor.image_drawable, p1, p2, (0, 0, 255), 1)
 
             # Draw bounding boxes
             try:

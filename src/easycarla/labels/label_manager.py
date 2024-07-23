@@ -7,6 +7,8 @@ import cv2
 from easycarla.sensors import Sensor, CameraSensor, DepthCameraSensor, LidarSensor, InsegCameraSensor
 from easycarla.labels.label_data import LabelData, ObjectType
 from easycarla.labels.label_types import map_carla_to_kitti, map_kitti_to_carla
+from easycarla.labels.calib_data import CalibrationData
+from easycarla.labels.kitti import KITTIDatasetGenerator
 from easycarla.tf import Transformation
 
 class LabelManager:
@@ -25,12 +27,18 @@ class LabelManager:
 
         self.env_objects: list[carla.EnvironmentObject] = []
         self.actors: list[carla.Actor] = []
-        self.hero: carla.Actor = None
+        self.ego_vehicle: carla.Actor = camera_sensor.actor.parent
         
         self.env_labels: LabelData = None
         self.actor_labels: LabelData = None
+        self.labels: LabelData = None
         
-        self.ego_vehicle = camera_sensor.actor.parent
+        world_to_camera = self.camera_sensor.get_world_to_actor()
+        lidar_to_world = self.lidar_sensor.get_actor_to_world()
+        self.lidar_to_camera = world_to_camera @ lidar_to_world
+
+        self.kitti = KITTIDatasetGenerator("data/kitti")
+        self.kitti.set_calibration(P2=self.camera_sensor.calibration, Tr_velo_to_cam=self.lidar_to_camera)
 
         self.init_bbs()
 
@@ -130,21 +138,26 @@ class LabelManager:
         # Calculate alpha in camera space
         labels.alpha = labels.get_alpha()
 
-        # Filter bbx with at least one point
+        # Now, we have our final data
+        self.labels = labels
+
+        self.kitti.process_frame(self.lidar_sensor.pointcloud, 
+                                 self.camera_sensor.image, 
+                                 self.depth_sensor.image, 
+                                 self.labels,
+                                 self.camera_sensor.sensor_data.frame)
+
+        # Retrieve pointcloud & draw onto image
         pointcloud = self.lidar_sensor.pointcloud
         points = pointcloud[:, :3]
-        lidar_to_world = self.lidar_sensor.get_actor_to_world()
-        lidar_to_camera = world_to_camera @ lidar_to_world
-        points = Transformation.transform_with_matrix(points, lidar_to_camera)
+        points = Transformation.transform_with_matrix(points, self.lidar_to_camera)
         points_proj, points_depth = self.camera_sensor.project(points)
-        
-        # Draw the points that are in the image
         mask_within_image = (points_proj[:, 0] >= 0) & (points_proj[:, 0] < self.camera_sensor.image_size[0]) & \
                             (points_proj[:, 1] >= 0) & (points_proj[:, 1] < self.camera_sensor.image_size[1]) & \
                             (points_depth > 0)
         points_proj = points_proj[mask_within_image]
         for point in points_proj:
-            cv2.circle(self.camera_sensor.rgb_image, point, 1, (200, 200, 200), 1)
+            cv2.circle(self.camera_sensor.image_drawable, point, 1, (200, 200, 200), 1)
 
         # Filter based on truncation
         mask_truncation_threshold = labels.truncation < 0.9
@@ -157,3 +170,7 @@ class LabelManager:
         bbs_pos = bbs_pos[:, labels.EDGE_INDICES]
         
         return bbs_pos
+
+    def export(self):
+        pass
+        

@@ -18,9 +18,9 @@ class DepthCameraSensor(CameraSensor):
         super().decode(data)
 
         # Read the R, G, and B channels
-        R = self.rgb_image[:, :, 0].astype(np.float32)
-        G = self.rgb_image[:, :, 1].astype(np.float32)
-        B = self.rgb_image[:, :, 2].astype(np.float32)
+        R = self.image[:, :, 0].astype(np.float32)
+        G = self.image[:, :, 1].astype(np.float32)
+        B = self.image[:, :, 2].astype(np.float32)
         
         # Calculate the normalized depth
         normalized_depth = (R + G * 256.0 + B * 256.0 * 256.0) / (256.0 * 256.0 * 256.0 - 1)
@@ -30,6 +30,3 @@ class DepthCameraSensor(CameraSensor):
 
         self.depth_values = depth_in_meters
     
-    def to_img(self) -> np.ndarray:
-        return self.rgb_image.swapaxes(0, 1)
-

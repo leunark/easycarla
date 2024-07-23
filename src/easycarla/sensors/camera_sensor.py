@@ -2,6 +2,7 @@ from pathlib import Path
 import logging
 import carla
 import numpy as np
+import cv2
 
 from easycarla.sensors import Sensor, MountingDirection, MountingPosition
 from easycarla.tf import Projection, Transformation
@@ -19,7 +20,8 @@ class CameraSensor(Sensor):
                  max_queue_size: int = 100):
         super().__init__(world, attached_actor, mounting_position, mounting_direction, image_size, sensor_options, max_queue_size)
         self.calibration = self.get_calibration()
-        self.rgb_image = None
+        self.image = None
+        self.image_drawable = None
 
     def create_blueprint(self) -> carla.ActorBlueprint:
         bp = self.world.get_blueprint_library().find('sensor.camera.rgb')
@@ -39,10 +41,11 @@ class CameraSensor(Sensor):
         image_data = image_data[:, :, ::-1]
 
         # Due to being called from thread, mandatory to create a copy
-        self.rgb_image = image_data.copy()
+        self.image = image_data
+        self.image_drawable = image_data.copy()
 
     def to_img(self) -> np.ndarray:
-        return self.rgb_image.swapaxes(0, 1)
+        return self.image_drawable.swapaxes(0, 1)
 
     def project(self, points: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
         return Projection.project_to_camera(
@@ -55,4 +58,6 @@ class CameraSensor(Sensor):
         height = self.bp.get_attribute('image_size_y').as_int()
         return Projection.build_projection_matrix(width, height, fov=fov)
 
+    def save(self, file_path: Path) -> None:
+        cv2.imwrite(str(file_path), self.image)
     

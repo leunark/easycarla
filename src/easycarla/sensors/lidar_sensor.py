@@ -1,3 +1,4 @@
+from pathlib import Path
 import carla
 import numpy as np
 
@@ -46,3 +47,10 @@ class LidarSensor(Sensor):
         lidar_img = np.zeros((lidar_img_size), dtype=np.uint8)
         lidar_img[tuple(lidar_data.T)] = (255, 255, 255)
         return lidar_img
+    
+    def save(self, file_path: Path) -> None:
+        # Ensure the point cloud is a numpy array of type float32
+        point_cloud = self.pointcloud.astype(np.float32)
+        
+        # Save to binary file
+        point_cloud.tofile(file_path)

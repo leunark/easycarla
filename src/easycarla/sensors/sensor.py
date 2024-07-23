@@ -72,9 +72,9 @@ class Sensor(ABC):
     def decode(self, data: carla.SensorData) -> None:
         ...
     
-    def save(self, output_folder: Path):
-        path = output_folder / f"{self.sensor_data.frame}.png"
-        logging.info(f"Not saved {path}.")
+    @abstractmethod
+    def save(self, file_path: Path) -> None:
+        ...
 
     def produce(self, data: carla.SensorData):
         # Add the image to the queue for later synchronized processing

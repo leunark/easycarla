@@ -3,6 +3,7 @@ import numpy as np
 from scipy.spatial.transform import Rotation
 from easycarla.labels.label_types import ObjectType
 
+
 @dataclass
 class LabelData:
 

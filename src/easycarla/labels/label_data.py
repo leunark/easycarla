@@ -6,7 +6,7 @@ from easycarla.labels.label_types import ObjectType
 
 @dataclass
 class LabelData:
-
+    """All attributes of shape (N, ...) containing all labels"""
     id: np.ndarray
     transform: np.ndarray  # 4x4 transformation matrices
     dimension: np.ndarray

@@ -40,13 +40,16 @@ class LidarSensor(Sensor):
         lidar_data *= min(disp_size) / lidar_range
         # Move points from origin to first quadrant (+x, +y)
         lidar_data += (0.5 * disp_size[0], 0.5 * disp_size[1])
-        lidar_data = np.fabs(lidar_data)  # pylint: disable=E1111
+        lidar_data = np.fabs(lidar_data)
         lidar_data = lidar_data.astype(np.int32)
         lidar_data = np.reshape(lidar_data, (-1, 2))
         lidar_img_size = (disp_size[0], disp_size[1], 3)
         lidar_img = np.zeros((lidar_img_size), dtype=np.uint8)
-        lidar_img[tuple(lidar_data.T)] = (255, 255, 255)
-        return lidar_img
+        # Transform data to image coordinate system x facing up
+        lidar_data = lidar_data.T[::-1]
+        lidar_data[1] = -lidar_data[1] + min(disp_size)
+        lidar_img[tuple(lidar_data)] = (255, 255, 255)
+        return lidar_img 
     
     def save(self, file_path: Path) -> None:
         # Ensure the point cloud is a numpy array of type float32

@@ -62,19 +62,42 @@ class KITTIDatasetGenerator:
     def format_label(self, labels: LabelData, index: int):
         bbox = labels.transform[index][:3, 3]  # Assuming this is the bounding box location in the form of [x, y, z]
         dimension = labels.dimension[index]
-        rotation_y = np.arctan2(labels.transform[index][1, 0], labels.transform[index][0, 0])
-        
-        label_str = f"{next(iter(labels.types[index])).value} "
+        # It assumes a specific rotation order (z-y-x or yaw-pitch-roll).
+        yaw_angle = np.arctan2(labels.transform[index][1, 0], labels.transform[index][0, 0])
+        occlusion = labels.occlusion[index] if labels.occlusion is not None else 0
+        # 0: Fully visible
+        if occlusion <= 0.6:
+            occlusion_level = 0
+        # 1: Partly occluded
+        elif occlusion <= 0.8:
+            occlusion_level = 1
+        # 2: Largely occluded
+        elif occlusion <= 1.0:
+            occlusion_level = 2
+        # 3: Unknown level of occlusion
+        else:
+            occlusion_level = 3
+            
+        label_str = f"{next(iter(labels.types[index])).name} "
         label_str = f"{labels.truncation[index] if labels.truncation is not None else 0} "
-        label_str += f"{labels.occlusion[index] if labels.occlusion is not None else 0} " 
+        label_str += f"{occlusion_level} " 
         label_str += f"{labels.alpha[index] if labels.alpha is not None else 0} "
-        label_str += f"{bbox[0]} {bbox[1]} {bbox[2]} "
+        label_str += f"{-1} {-1} {-1} {-1} "
         label_str += f"{dimension[0]} {dimension[1]} {dimension[2]} "
         label_str += f"{bbox[0]} {bbox[1]} {bbox[2]} "
-        label_str += f"{rotation_y}\n"
+        label_str += f"{yaw_angle}\n"
         return label_str
 
     def process_frame(self, pointcloud: np.ndarray, image: np.ndarray, depth_image: np.ndarray, labels: LabelData, frame_id: int = None):
+        # Transform pointcloud to kitti coordinate system
+        pointcloud = np.column_stack((pointcloud[:, 0], -1 * pointcloud[:, 1], pointcloud[:, 2]))
+        T = np.array([
+            [1,  0, 0, 0],
+            [0, -1, 0, 0],
+            [0,  0, 1, 0],
+            [0,  0, 0, 1]
+        ])
+        labels.apply_transform(T)
         self.frame_id = frame_id if frame_id is not None else self.frame_id + 1
         self.save_point_cloud(pointcloud)
         self.save_depth_image(depth_image)

@@ -100,10 +100,8 @@ class LabelManager:
         if len(labels) == 0:
             return
         
-        # Vectorize hero transform
+        # Filter initially in world space by distance to reduce bounding boxes
         lidar_pos, lidar_forward = self.lidar_sensor.get_transform()
-
-        # Filter objects in distance of lidar
         labels.filter_by_distance(distance=self.lidar_sensor.range, target=lidar_pos)
         if len(labels) == 0:
             return None
@@ -113,34 +111,37 @@ class LabelManager:
         labels.apply_transform(world_to_camera)
 
         # Project edges onto sensor
-        vertices = labels.vertices
-        num_of_vertices = vertices.shape[1]
-        bbs_pos, bbs_depth = self.camera_sensor.project(vertices)
+        bbs3d = labels.vertices
+        num_of_vertices = bbs3d.shape[1]
+        bbs2d, bbs2d_depth = self.camera_sensor.project(bbs3d)
 
         # Calculate truncation
-        mask_within_image = (bbs_pos[:, :, 0] >= 0) & (bbs_pos[:, :, 0] < self.camera_sensor.image_size[0]) & \
-                            (bbs_pos[:, :, 1] >= 0) & (bbs_pos[:, :, 1] < self.camera_sensor.image_size[1]) & \
-                            (bbs_depth > 0)
+        mask_within_image = (bbs2d[:, :, 0] >= 0) & (bbs2d[:, :, 0] < self.camera_sensor.image_size[0]) & \
+                            (bbs2d[:, :, 1] >= 0) & (bbs2d[:, :, 1] < self.camera_sensor.image_size[1]) & \
+                            (bbs2d_depth > 0)
         num_of_verts_outside_image = np.count_nonzero(np.invert(mask_within_image), axis=1)
         labels.truncation = num_of_verts_outside_image / num_of_vertices
         
         # Calculate occlusion with depth data
         depth_values = self.depth_sensor.depth_values
-        bbs_occluded_depth = np.zeros_like(bbs_depth)
-        bbs_pos_within_image = bbs_pos[mask_within_image]
+        bbs_occluded_depth = np.ones_like(bbs2d_depth)
+        bbs_pos_within_image = bbs2d[mask_within_image]
         depth_image_coords = bbs_pos_within_image.T[::-1]
         bbs_pos_within_image_depth = depth_values[depth_image_coords[0], depth_image_coords[1]]
         bbs_occluded_depth[mask_within_image] = bbs_pos_within_image_depth
-        bbs_verts_occluded = bbs_depth > bbs_occluded_depth + 0.1
+        bbs_verts_occluded = bbs2d_depth > bbs_occluded_depth + 0.1
         num_of_verts_occluded = np.count_nonzero(bbs_verts_occluded, axis=1)
         labels.occlusion = num_of_verts_occluded / num_of_vertices
+        mask_visible = labels.occlusion < 1.0
+        labels.filter(mask_visible)
+        bbs2d = bbs2d[mask_visible]
+        bbs2d_depth = bbs2d_depth[mask_visible]
 
         # Calculate alpha in camera space
         labels.alpha = labels.get_alpha()
 
-        # Now, we have our final data
+        # Now, we have our final data and we can generate our dataset
         self.labels = labels
-
         self.kitti.process_frame(self.lidar_sensor.pointcloud, 
                                  self.camera_sensor.image, 
                                  self.depth_sensor.image, 
@@ -163,14 +164,14 @@ class LabelManager:
         mask_truncation_threshold = labels.truncation < 0.9
         mask_occlusion_threshold = labels.occlusion < 0.9
         mask = mask_truncation_threshold & mask_occlusion_threshold
-        bbs_depth = bbs_depth[mask]
-        bbs_pos = bbs_pos[mask]
+        bbs2d_depth = bbs2d_depth[mask]
+        bbs2d = bbs2d[mask]
 
         # Retrieve all edges from bounding boxes
-        bbs_pos = bbs_pos[:, labels.EDGE_INDICES]
+        bbs2d = bbs2d[:, labels.EDGE_INDICES]
         
-        return bbs_pos
+        return bbs2d
 
     def export(self):
         pass
-        
+    

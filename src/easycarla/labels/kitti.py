@@ -78,8 +78,8 @@ class KITTIDatasetGenerator:
         else:
             occlusion_level = 3
             
-        label_str = f"{next(iter(labels.types[index])).name} "
-        label_str = f"{labels.truncation[index] if labels.truncation is not None else 0} "
+        label_str = f"{next(iter(labels.types[index])).value} "
+        label_str += f"{labels.truncation[index] if labels.truncation is not None else 0} "
         label_str += f"{occlusion_level} " 
         label_str += f"{labels.alpha[index] if labels.alpha is not None else 0} "
         label_str += f"{-1} {-1} {-1} {-1} "

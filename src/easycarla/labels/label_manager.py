@@ -186,14 +186,27 @@ class LabelManager:
                 cv2.circle(self.camera_sensor.preview_image, point, 1, (200, 200, 200), 1)
 
         # Filter labels for visualization
-        mask_truncation_threshold = labels.truncation < 0.9
-        mask_occlusion_threshold = labels.occlusion < 0.9
+        mask_truncation_threshold = labels.truncation < 0.95
+        mask_occlusion_threshold = labels.occlusion < 0.95
         mask = mask_truncation_threshold & mask_occlusion_threshold
         bbsv2d_depth = bbsv2d_depth[mask]
         bbsv2d = bbsv2d[mask]
 
         # Retrieve edges from the vertices of the bounding boxes
-        self.bbse2d = bbsv2d[:, labels.EDGE_INDICES]
+        bbse2d = bbsv2d[:, labels.EDGE_INDICES]
+
+        # Draw edges within image boundaries
+        image_width, image_height = self.camera_sensor.image_size
+        if bbse2d is None or bbse2d.shape[0] == 0:
+            return
+        for bb in bbse2d:
+            for edge in bb:
+                p1, p2 = edge
+                ret, p1, p2 = cv2.clipLine((0, 0, image_width, image_height), p1.astype(int), p2.astype(int))
+                if ret:
+                    cv2.line(self.camera_sensor.preview_image, p1, p2, (0, 0, 255), 1)
+
+        self.bbse2d = bbse2d
 
     def export(self):
         pass

@@ -11,8 +11,8 @@ class SpawnManagerConfig:
     seed: int = None
     tm_port: int = 8000
     respawn_dormant_vehicles: bool = True
-    hybrid_physics_mode: bool = False
-    hybrid_physics_mode_radius: float = 70.0
+    hybrid_physics_mode: bool = True
+    hybrid_physics_mode_radius: float = 30.0
     percentage_pedestrians_crossing: float = 0.3
     percentage_pedestrians_running: float = 0.05
     percentage_speed_difference: float = 30.0
@@ -27,6 +27,7 @@ class SpawnManager:
         self.config = config
 
         # Lists to track spawned vehicles and walkers
+        self.hero = None
         self.vehicles = []
         self.pedestrians = []
         self.pedestrian_controllers = []
@@ -37,6 +38,7 @@ class SpawnManager:
         self.sync = self.world.get_settings().synchronous_mode
 
         # Set up the traffic manager
+        self.client.get_trafficmanager(self.config.tm_port).shut_down()
         self.traffic_manager = self.client.get_trafficmanager(self.config.tm_port)
         self.traffic_manager.global_percentage_speed_difference(self.config.percentage_speed_difference)
         self.traffic_manager.set_global_distance_to_leading_vehicle(self.config.distance_to_leading_vehicle)
@@ -73,25 +75,36 @@ class SpawnManager:
         self.traffic_manager.vehicle_percentage_speed_difference(vehicle, random.uniform(-20, 20))
         self.traffic_manager.update_vehicle_lights(vehicle, random.uniform() < self.config.percentage_vehicles_lights_on)
         return vehicle
-        
-    def spawn_vehicles(self, number_of_vehicles: int, filter: str = "vehicle.*"):
+
+    def spawn_hero(self, filter: str = "vehicle.*"):
+        if self.hero is not None:
+            raise RuntimeError("Hero has been spawned already")
+        vehicles = self.spawn_vehicles(1, filter, is_hero=True)
+        if len(vehicles) == 0:
+            raise RuntimeError("Failed to spawn hero")
+        self.hero = vehicles[0]
+        return self.hero
+
+    def spawn_vehicles(self, number_of_vehicles: int, filter: str = "vehicle.*", is_hero: bool = False):
         spawn_points = self.world.get_map().get_spawn_points()
         random.shuffle(spawn_points)
 
         blueprint_library = self.vehicle_blueprint_library.filter(filter)
         blueprints = [bp for bp in blueprint_library if bp.get_attribute("base_type") not in []]
 
+        vehicles = []
         for spawn_point in spawn_points:
-            if len(self.vehicles) >= number_of_vehicles:
+            if len(vehicles) >= number_of_vehicles:
                 break
             blueprint = random.choice(blueprints)
-            vehicle = self.spawn_vehicle(blueprint, spawn_point)
+            vehicle = self.spawn_vehicle(blueprint, spawn_point, is_hero)
             if vehicle:
-                self.vehicles.append(vehicle)
-        if len(self.vehicles) < number_of_vehicles:
-            logging.warn(f"Failed to spawn {number_of_vehicles - len(self.vehicles)} vehicles.")
-
-        logging.info(f"Successfully spawned {len(self.vehicles)} vehicles.")
+                vehicles.append(vehicle)
+        if len(vehicles) < number_of_vehicles:
+            logging.warn(f"Failed to spawn {number_of_vehicles - len(vehicles)} vehicles.")
+        logging.info(f"Successfully spawned {len(vehicles)} vehicles.")
+        self.vehicles.extend(vehicles)
+        return vehicles
 
     def spawn_pedestrian(self, blueprint: carla.ActorBlueprint, spawn_point: carla.Transform):
         pedestrian = self.world.try_spawn_actor(blueprint, spawn_point)
@@ -106,25 +119,27 @@ class SpawnManager:
         if not controller:
             pedestrian.destroy()
             return None, None
-        
         return pedestrian, controller
 
     def spawn_pedestrians(self, num_pedestrians: int):
-        while len(self.pedestrians) < num_pedestrians:
+        pedestrians = []
+        pedestrian_controllers = []
+
+        while len(pedestrians) < num_pedestrians:
             blueprint = random.choice(self.pedestrian_blueprint_library)
             spawn_point = carla.Transform(self.world.get_random_location_from_navigation())
             pedestrian, controller = self.spawn_pedestrian(blueprint, spawn_point)
             if not pedestrian or not controller:
                 continue
-            self.pedestrians.append(pedestrian)
-            self.pedestrian_controllers.append(controller)
-        
+            pedestrians.append(pedestrian)
+            pedestrian_controllers.append(controller)
+
         # IMPORTANT NOTE: We need to tick the world once to make the controllers available in sync mode
         if self.sync:
             self.world.tick()
 
         # Then, activate the controllers
-        for controller in self.pedestrian_controllers:
+        for controller in pedestrian_controllers:
             controller.start()
             controller.go_to_location(self.world.get_random_location_from_navigation())
 
@@ -138,7 +153,11 @@ class SpawnManager:
             else:
                 controller.set_max_speed(0.0)  # Fallback to previous method
 
+        self.pedestrians.extend(pedestrians)
+        self.pedestrian_controllers.extend(pedestrian_controllers)
         logging.info(f"Successfully spawned {len(self.pedestrians)} pedestrians.")
+
+        return pedestrians, pedestrian_controllers
 
     def destroy(self):
         for vehicle in self.vehicles:

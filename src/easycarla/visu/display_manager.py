@@ -122,38 +122,10 @@ class DisplayManager:
 
     def draw_sensors(self):
         for sensor, display_pos, scale_mode in self.sensors:
-            img = sensor.to_img()
+            img = sensor.preview()
             if img is not None:
                 surface = pygame.surfarray.make_surface(img)
                 self.draw_surface(surface, display_pos, scale_mode)
-
-    def draw_bounding_boxes(self, bounding_boxes: np.ndarray):
-        """
-        Draws bounding boxes on pygame display.
-        """
-        width, height = self.display.get_size()
-        bb_surface = pygame.Surface((width, height))
-        bb_surface.set_colorkey((0, 0, 0))
-        bb_color = (248, 64, 24)
-        for bbox in bounding_boxes:
-            points = [(int(bbox[i, 0]), int(bbox[i, 1])) for i in range(8)]
-            # draw lines
-            # base
-            pygame.draw.line(bb_surface, bb_color, points[0], points[1])
-            pygame.draw.line(bb_surface, bb_color, points[1], points[2])
-            pygame.draw.line(bb_surface, bb_color, points[2], points[3])
-            pygame.draw.line(bb_surface, bb_color, points[3], points[0])
-            # top
-            pygame.draw.line(bb_surface, bb_color, points[4], points[5])
-            pygame.draw.line(bb_surface, bb_color, points[5], points[6])
-            pygame.draw.line(bb_surface, bb_color, points[6], points[7])
-            pygame.draw.line(bb_surface, bb_color, points[7], points[4])
-            # base-top
-            pygame.draw.line(bb_surface, bb_color, points[0], points[4])
-            pygame.draw.line(bb_surface, bb_color, points[1], points[5])
-            pygame.draw.line(bb_surface, bb_color, points[2], points[6])
-            pygame.draw.line(bb_surface, bb_color, points[3], points[7])
-        self.display.blit(bb_surface, (0, 0))
 
     def draw_surface(self, surface: pygame.Surface, display_pos: tuple[int, int], scale_mode: ScaleMode):
         display_offset = self.get_display_offset(display_pos)
@@ -173,7 +145,7 @@ class DisplayManager:
             scale = min(dest_rect.width / src_rect.width, dest_rect.height / src_rect.height)
             src_surface = pygame.transform.scale(src_surface, (src_rect.width * scale, src_rect.height * scale))
             src_rect = src_surface.get_rect()
-            dest = (dest_rect.topleft[0], dest_rect.topleft[1] + (dest_rect.height - src_rect.height) // 2)
+            dest = (dest_rect.topleft[0] + (dest_rect.width - src_rect.width) // 2, dest_rect.topleft[1] + (dest_rect.height - src_rect.height) // 2)
             dest_surface.blit(src_surface, dest)
 
         elif scale_mode == ScaleMode.ZOOM_CENTER:

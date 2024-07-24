@@ -6,9 +6,8 @@ import traceback
 import time
 import cv2
 import numpy as np
-from concurrent.futures import ThreadPoolExecutor
 from easycarla.sim.simulation_manager import SimulationManager
-from easycarla.sim.display_manager import DisplayManager, ScaleMode
+from easycarla.visu.display_manager import DisplayManager, ScaleMode
 from easycarla.sensors import Sensor, CameraSensor, LidarSensor, DepthCameraSensor, MountingDirection, MountingPosition
 from easycarla.sensors.world_sensor import WorldSensor
 from easycarla.sim.spawn_manager import SpawnManager, SpawnManagerConfig
@@ -24,12 +23,16 @@ port = 2000
 client_timeout = 60
 sync = True
 fixed_delta_seconds = 0.05
-fps = 30
+fps = 20
 timeout=0.01
 num_vehicles = 30
 num_pedestrians = 40
 seed = 123
 reset = False
+distance = 50
+show_points = False
+show_gizmo = False
+output_dir = None #"data/kitti"
 
 def main():
     simulation_manager = None
@@ -56,7 +59,7 @@ def main():
         spawn_manager.spawn_pedestrians(num_pedestrians)
 
         # Choose hero vehicle
-        hero = random.choice(spawn_manager.vehicles)
+        hero = spawn_manager.spawn_hero()
         
         # Spawn sensors
         world_sensor = WorldSensor(world=simulation_manager.world)
@@ -64,16 +67,19 @@ def main():
             attached_actor=hero,
             mounting_position=MountingPosition.FRONT, 
             mounting_direction=MountingDirection.FORWARD,
+            mounting_offset=0.0,
             image_size=[800,600])
         depth_sensor = DepthCameraSensor(world=simulation_manager.world, 
             attached_actor=hero,
             mounting_position=MountingPosition.FRONT, 
             mounting_direction=MountingDirection.FORWARD,
+            mounting_offset=0.0,
             image_size=[800,600])
         lidar_sensor = LidarSensor(world=simulation_manager.world, 
             attached_actor=hero,
             mounting_position=MountingPosition.TOP, 
             mounting_direction=MountingDirection.FORWARD,
+            mounting_offset=0.5,
             image_size=[400,400],
             # Sensor tick of 0 will let the sensor create a scan for every world tick.
             # Combined with rotation frequency be the same as the simulation tick frequency
@@ -96,7 +102,7 @@ def main():
         display_manager = DisplayManager(grid_size=[1, 2], fps=fps)
         display_manager.add_sensor(lidar_sensor, (0, 0), ScaleMode.SCALE_FIT)
         display_manager.add_sensor(rgb_sensor, (0, 1), ScaleMode.SCALE_FIT)
-        #display_manager.add_sensor(depth_sensor, (0, 2), ScaleMode.ZOOM_CENTER)
+        #display_manager.add_sensor(depth_sensor, (2, 0), ScaleMode.ZOOM_CENTER)
 
         sensors: list[Sensor] = [
             rgb_sensor, 
@@ -105,17 +111,27 @@ def main():
         ]
 
         # Create label manager for 2d and 3d bounding boxes
-        label_manager = LabelManager(simulation_manager.world, {
-            carla.CityObjectLabel.Pedestrians,
-            carla.CityObjectLabel.Car,
-            carla.CityObjectLabel.Bus,
-            carla.CityObjectLabel.Truck,
-            carla.CityObjectLabel.Motorcycle,
-            carla.CityObjectLabel.Bicycle,
-            carla.CityObjectLabel.Rider
-        }, camera_sensor=rgb_sensor, depth_sensor=depth_sensor, lidar_sensor=lidar_sensor)
+        label_manager = LabelManager(
+            world=simulation_manager.world, 
+            carla_types={
+                carla.CityObjectLabel.Pedestrians,
+                carla.CityObjectLabel.Car,
+                carla.CityObjectLabel.Bus,
+                carla.CityObjectLabel.Truck,
+                carla.CityObjectLabel.Motorcycle,
+                #carla.CityObjectLabel.Bicycle,
+                carla.CityObjectLabel.Rider}, 
+            camera_sensor=rgb_sensor, 
+            depth_sensor=depth_sensor, 
+            lidar_sensor=lidar_sensor,
+            distance=distance,
+            show_points=show_points,
+            output_dir=output_dir)
 
-        def process():
+        while True:
+            # Carla Tick
+            simulation_manager.tick()
+
             # Consume first sensors, so all data is available after for the same frame
             try:
                 world_sensor.consume()
@@ -124,45 +140,21 @@ def main():
                     sensor.consume(world_snapshot.frame, timeout=1.0)
             except Exception as ex:
                 logging.warning(f"Failed to consume on frame {world_snapshot.frame}")
-
-            # Gizmo on hero vehicle
-            world_sensor.world.debug.draw_arrow(
-                            hero.get_transform().location, 
-                            hero.get_transform().location + hero.get_transform().get_forward_vector(),
-                            thickness=0.1, arrow_size=0.1, color=carla.Color(255,0,0), life_time=10)
             
-            def draw_bbs():
-                # Retrieve bounding boxes
-                bbs_proj_edges = label_manager.update()
-                if bbs_proj_edges is None:
-                    return
+            # Gizmo on hero vehicle
+            if show_gizmo:
+                world_sensor.world.debug.draw_arrow(
+                                hero.get_transform().location, 
+                                hero.get_transform().location + hero.get_transform().get_forward_vector(),
+                                thickness=0.1, arrow_size=0.1, color=carla.Color(255,0,0), life_time=10)
 
-                # Draw edges within image boundaries
-                image_width, image_height = rgb_sensor.image_size
-                for bb in bbs_proj_edges:
-                    for edge in bb:
-                        p1, p2 = edge
-                        ret, p1, p2 = cv2.clipLine((0, 0, image_width, image_height), p1.astype(int), p2.astype(int))
-                        if ret:
-                            cv2.line(rgb_sensor.image_drawable, p1, p2, (0, 0, 255), 1)
-
-            # Draw bounding boxes
-            try:
-                draw_bbs()
-            except Exception as ex:
-                traceback.print_exc()
-
+            # Retrieve bounding boxes
+            label_manager.update()
+    
             # Render data
             display_manager.draw_sensors()
             display_manager.draw_fps(world_snapshot.timestamp.delta_seconds)
             display_manager.tick()
-
-        while True:
-            # Carla Tick
-            simulation_manager.tick()
-            
-            with ThreadPoolExecutor() as executor:
-                future = executor.submit(process)
 
             # Must listen to events to prevent unresponsive window
             if display_manager.should_quit():

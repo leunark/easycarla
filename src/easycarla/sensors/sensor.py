@@ -45,10 +45,11 @@ class Sensor(ABC):
                  mounting_direction: MountingDirection,
                  image_size: tuple[int, int],
                  sensor_options: dict = {},
-                 max_queue_size: int = 100):
+                 max_queue_size: int = 100,
+                 mounting_offset: float = 0.0):
         self.world = world
         self.attached_actor = attached_actor
-        self.transform = self.get_mounting_transform(mounting_position, mounting_direction)
+        self.transform = self.get_mounting_transform(mounting_position, mounting_direction, mounting_offset)
         self.sensor_options = sensor_options
         self.image_size = image_size
 
@@ -65,7 +66,7 @@ class Sensor(ABC):
         ...
 
     @abstractmethod
-    def to_img(self) -> np.ndarray:
+    def preview(self) -> np.ndarray:
         ...
 
     @abstractmethod
@@ -120,7 +121,7 @@ class Sensor(ABC):
     def get_mounting_transform(self, 
                               mounting_position: MountingPosition, 
                               mounting_direction: MountingDirection, 
-                              offset: float = 0.5) -> carla.Transform:
+                              offset: float = 0.0) -> carla.Transform:
         # Mounting position based on bounding box
         bounding_box = self.attached_actor.bounding_box
         extent = bounding_box.extent

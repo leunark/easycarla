@@ -13,8 +13,9 @@ class LidarSensor(Sensor):
                  mounting_direction: MountingDirection, 
                  image_size: tuple[int, int], 
                  sensor_options: dict = {}, 
-                 max_queue_size: int = 100):
-        super().__init__(world, attached_actor, mounting_position, mounting_direction, image_size, sensor_options, max_queue_size)
+                 max_queue_size: int = 100,
+                 mounting_offset: float = 0.5):
+        super().__init__(world, attached_actor, mounting_position, mounting_direction, image_size, sensor_options, max_queue_size, mounting_offset)
         self.range = float(self.bp.get_attribute('range'))
         self.pointcloud = None
 
@@ -31,23 +32,23 @@ class LidarSensor(Sensor):
         points = np.reshape(points, (int(points.shape[0] / 4), 4))
         self.pointcloud = points
 
-    def to_img(self) -> np.ndarray:
+    def preview(self) -> np.ndarray:
         # Take xy plane and scale to display size
-        disp_size = self.image_size
+        width, height = self.image_size
         points = self.pointcloud
         lidar_range = 2.0*float(self.sensor_options['range'])
         lidar_data = np.array(points[:, :2])
-        lidar_data *= min(disp_size) / lidar_range
+        lidar_data *= min(width, height) / lidar_range
         # Move points from origin to first quadrant (+x, +y)
-        lidar_data += (0.5 * disp_size[0], 0.5 * disp_size[1])
+        lidar_data += (0.5 * width, 0.5 * height)
         lidar_data = np.fabs(lidar_data)
         lidar_data = lidar_data.astype(np.int32)
         lidar_data = np.reshape(lidar_data, (-1, 2))
-        lidar_img_size = (disp_size[0], disp_size[1], 3)
+        lidar_img_size = (width, height, 3)
         lidar_img = np.zeros((lidar_img_size), dtype=np.uint8)
         # Transform data to image coordinate system x facing up
         lidar_data = lidar_data.T[::-1]
-        lidar_data[1] = -lidar_data[1] + min(disp_size)
+        lidar_data[1] = -lidar_data[1] + min(width, height) - 1
         lidar_img[tuple(lidar_data)] = (255, 255, 255)
         return lidar_img 
     

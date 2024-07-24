@@ -3,6 +3,7 @@ import numpy as np
 import logging
 from dataclasses import dataclass
 import cv2 
+from pathlib import Path
 
 from easycarla.sensors import Sensor, CameraSensor, DepthCameraSensor, LidarSensor, InsegCameraSensor
 from easycarla.labels.label_data import LabelData, ObjectType
@@ -18,12 +19,18 @@ class LabelManager:
                  carla_types: set[carla.CityObjectLabel],
                  camera_sensor: CameraSensor,
                  depth_sensor: DepthCameraSensor,
-                 lidar_sensor: LidarSensor) -> None:
+                 lidar_sensor: LidarSensor,
+                 distance: float = 50,
+                 show_points: bool = False, 
+                 output_dir: Path|str = None) -> None:
         self.world = world
         self.carla_types = carla_types
         self.camera_sensor = camera_sensor
         self.depth_sensor = depth_sensor
         self.lidar_sensor = lidar_sensor
+        self.distance = distance
+        self.show_points = show_points
+        self.output_dir = Path(output_dir) if output_dir is not None else None
 
         self.env_objects: list[carla.EnvironmentObject] = []
         self.actors: list[carla.Actor] = []
@@ -37,8 +44,12 @@ class LabelManager:
         lidar_to_world = self.lidar_sensor.get_actor_to_world()
         self.lidar_to_camera = world_to_camera @ lidar_to_world
 
-        self.kitti = KITTIDatasetGenerator("data/kitti")
-        self.kitti.set_calibration(P2=self.camera_sensor.calibration, Tr_velo_to_cam=self.lidar_to_camera)
+        if self.output_dir is not None:
+            self.kitti = KITTIDatasetGenerator(self.output_dir)
+            self.kitti.set_calibration(P2=self.camera_sensor.calibration, Tr_velo_to_cam=self.lidar_to_camera)
+
+        self.bbse2d: np.ndarray = None
+        self.pc2d: np.ndarray = None
 
         self.init_bbs()
 
@@ -54,8 +65,8 @@ class LabelManager:
         
         # Remove ego vehicle from actor list
         if self.ego_vehicle is not None:
-            self.actors = [a for a in self.actors if a.id != self.ego_vehicle.id]
-        
+            self.actors = [a for a in self.actors if a.id != self.ego_vehicle.id and a.is_active and a.is_alive]
+
     def create_labels(self, label_objects: list[carla.EnvironmentObject | carla.Actor]) -> LabelData:
         # Extract transformations and types
         id_list = np.array([int(obj.id) for obj in label_objects])
@@ -102,75 +113,87 @@ class LabelManager:
         
         # Filter initially in world space by distance to reduce bounding boxes
         lidar_pos, lidar_forward = self.lidar_sensor.get_transform()
-        labels.filter_by_distance(distance=self.lidar_sensor.range, target=lidar_pos)
+        labels.filter_by_distance(distance=self.distance, target=lidar_pos)
         if len(labels) == 0:
-            return None
+            return
 
         # Transform to sensor coordinate system
         world_to_camera = self.camera_sensor.get_world_to_actor()
         labels.apply_transform(world_to_camera)
 
-        # Project edges onto sensor
+        # Project vertices onto sensor
         bbs3d = labels.vertices
         num_of_vertices = bbs3d.shape[1]
-        bbs2d, bbs2d_depth = self.camera_sensor.project(bbs3d)
+        bbsv2d, bbsv2d_depth = self.camera_sensor.project(bbs3d)
 
-        # Calculate truncation
-        mask_within_image = (bbs2d[:, :, 0] >= 0) & (bbs2d[:, :, 0] < self.camera_sensor.image_size[0]) & \
-                            (bbs2d[:, :, 1] >= 0) & (bbs2d[:, :, 1] < self.camera_sensor.image_size[1]) & \
-                            (bbs2d_depth > 0)
+        # Calculate truncation with projection
+        mask_within_image = (bbsv2d[:, :, 0] >= 0) & (bbsv2d[:, :, 0] < self.camera_sensor.image_size[0]) & \
+                            (bbsv2d[:, :, 1] >= 0) & (bbsv2d[:, :, 1] < self.camera_sensor.image_size[1]) & \
+                            (bbsv2d_depth > 0)
         num_of_verts_outside_image = np.count_nonzero(np.invert(mask_within_image), axis=1)
         labels.truncation = num_of_verts_outside_image / num_of_vertices
-        
+
+        # Remove fully truncated bounding boxes
+        mask_not_fully_truncated = labels.truncation < 1.0
+        labels.filter(mask_not_fully_truncated)
+        bbsv2d = bbsv2d[mask_not_fully_truncated]
+        bbsv2d_depth = bbsv2d_depth[mask_not_fully_truncated]
+        mask_within_image = mask_within_image[mask_not_fully_truncated]
+
         # Calculate occlusion with depth data
         depth_values = self.depth_sensor.depth_values
-        bbs_occluded_depth = np.ones_like(bbs2d_depth)
-        bbs_pos_within_image = bbs2d[mask_within_image]
+        bbs_occluded_depth = np.ones_like(bbsv2d_depth)
+        bbs_pos_within_image = bbsv2d[mask_within_image]
         depth_image_coords = bbs_pos_within_image.T[::-1]
         bbs_pos_within_image_depth = depth_values[depth_image_coords[0], depth_image_coords[1]]
         bbs_occluded_depth[mask_within_image] = bbs_pos_within_image_depth
-        bbs_verts_occluded = bbs2d_depth > bbs_occluded_depth + 0.1
+        bbs_verts_occluded = bbsv2d_depth > bbs_occluded_depth + 0.1
         num_of_verts_occluded = np.count_nonzero(bbs_verts_occluded, axis=1)
         labels.occlusion = num_of_verts_occluded / num_of_vertices
-        mask_visible = labels.occlusion < 1.0
-        labels.filter(mask_visible)
-        bbs2d = bbs2d[mask_visible]
-        bbs2d_depth = bbs2d_depth[mask_visible]
+
+        # Remove fully occluded bounding boxes
+        mask_not_fully_occluded = labels.occlusion < 1.0
+        labels.filter(mask_not_fully_occluded)
+        bbsv2d = bbsv2d[mask_not_fully_occluded]
+        bbsv2d_depth = bbsv2d_depth[mask_not_fully_occluded]
 
         # Calculate alpha in camera space
         labels.alpha = labels.get_alpha()
 
-        # Now, we have our final data and we can generate our dataset
+        # Now, we have our final label data
         self.labels = labels
-        self.kitti.process_frame(self.lidar_sensor.pointcloud, 
-                                 self.camera_sensor.image, 
-                                 self.depth_sensor.image, 
-                                 self.labels,
-                                 self.camera_sensor.sensor_data.frame)
+
+        # Generate dataset
+        if self.output_dir is not None:
+            self.kitti.process_frame(self.lidar_sensor.pointcloud, 
+                                    self.camera_sensor.rgb_image, 
+                                    self.depth_sensor.rgb_image, 
+                                    self.labels,
+                                    self.camera_sensor.sensor_data.frame)
 
         # Retrieve pointcloud & draw onto image
-        pointcloud = self.lidar_sensor.pointcloud
-        points = pointcloud[:, :3]
-        points = Transformation.transform_with_matrix(points, self.lidar_to_camera)
-        points_proj, points_depth = self.camera_sensor.project(points)
-        mask_within_image = (points_proj[:, 0] >= 0) & (points_proj[:, 0] < self.camera_sensor.image_size[0]) & \
-                            (points_proj[:, 1] >= 0) & (points_proj[:, 1] < self.camera_sensor.image_size[1]) & \
-                            (points_depth > 0)
-        points_proj = points_proj[mask_within_image]
-        for point in points_proj:
-            cv2.circle(self.camera_sensor.image_drawable, point, 1, (200, 200, 200), 1)
+        if self.show_points:
+            pointcloud = self.lidar_sensor.pointcloud
+            pc3d = pointcloud[:, :3]
+            pc3d = Transformation.transform_with_matrix(pc3d, self.lidar_to_camera)
+            pc2d, pc2d_depth = self.camera_sensor.project(pc3d)
+            mask_within_image = (pc2d[:, 0] >= 0) & (pc2d[:, 0] < self.camera_sensor.image_size[0]) & \
+                                (pc2d[:, 1] >= 0) & (pc2d[:, 1] < self.camera_sensor.image_size[1]) & \
+                                (pc2d_depth > 0)
+            pc2d = pc2d[mask_within_image]
+            self.pc2d = pc2d
+            for point in pc2d:
+                cv2.circle(self.camera_sensor.preview_image, point, 1, (200, 200, 200), 1)
 
-        # Filter based on truncation
+        # Filter labels for visualization
         mask_truncation_threshold = labels.truncation < 0.9
         mask_occlusion_threshold = labels.occlusion < 0.9
         mask = mask_truncation_threshold & mask_occlusion_threshold
-        bbs2d_depth = bbs2d_depth[mask]
-        bbs2d = bbs2d[mask]
+        bbsv2d_depth = bbsv2d_depth[mask]
+        bbsv2d = bbsv2d[mask]
 
-        # Retrieve all edges from bounding boxes
-        bbs2d = bbs2d[:, labels.EDGE_INDICES]
-        
-        return bbs2d
+        # Retrieve edges from the vertices of the bounding boxes
+        self.bbse2d = bbsv2d[:, labels.EDGE_INDICES]
 
     def export(self):
         pass

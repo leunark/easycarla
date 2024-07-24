@@ -22,5 +22,5 @@ class InsegCameraSensor(CameraSensor):
         instance_ids = decoded_data[:, :, 1].astype(int) * 255 + decoded_data[:, :, 2].astype(int)
         return np.concatenate((semantic_ids[:, :, None], instance_ids[:, :, None]), axis=2)
     
-    def to_img(self) -> np.ndarray:
+    def preview(self) -> np.ndarray:
         return self.cache_data.swapaxes(0, 1)

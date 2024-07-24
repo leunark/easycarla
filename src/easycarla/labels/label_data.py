@@ -163,16 +163,3 @@ class LabelData:
         angle = np.arctan2(cross_product, dot_product)
 
         return angle
-
-    @classmethod
-    def from_position_and_rotation_matrix(cls, position: np.ndarray, rotation_matrix: np.ndarray, **kwargs):
-        n = position.shape[0]
-        transform = np.tile(np.eye(4), (n, 1, 1))
-        transform[:, :3, :3] = rotation_matrix
-        transform[:, :3, 3] = position
-        return cls(transform=transform, **kwargs)
-
-    @classmethod
-    def from_position_and_euler_angles(cls, position: np.ndarray, euler_angles: np.ndarray, **kwargs):
-        rotation_matrix = Rotation.from_euler('xyz', euler_angles).as_matrix()
-        return cls.from_position_and_rotation_matrix(position, rotation_matrix, **kwargs)

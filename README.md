@@ -1,6 +1,6 @@
-# Carla Training Data Generator
+# easycarla
 
-This project uses the Carla simulator to generate training data for autonomous driving models. Carla provides a flexible and scalable platform for generating a wide range of driving scenarios and capturing various sensor data.
+This project uses the Carla simulator to generate training data for autonomous driving models. Carla provides a flexible and scalable platform for generating a wide range of driving scenarios and capturing various sensor data. It consists out of multiple modules that can be uused even independently for other use cases. All code was vectorized for better performance.
 
 ## Table of Contents
 

@@ -42,6 +42,11 @@ class KITTIDatasetGenerator:
         with calib_path.open('w') as f:
             f.write(self.format_calibration(P2, Tr_velo_to_cam))
 
+    def save_timestamp(self, timestamp: float):
+        times_path = self.base_dir / 'times.txt'
+        with times_path.open('a') as f:
+            f.write(f"{timestamp}\n")
+
     def format_calibration(self, P2: np.ndarray, Tr_velo_to_cam: np.ndarray):
         calib_text = ''
         calib_text += 'P0: ' + ' '.join(['0'] * 12) + '\n'
@@ -88,7 +93,7 @@ class KITTIDatasetGenerator:
         label_str += f"{yaw_angle}\n"
         return label_str
 
-    def process_frame(self, pointcloud: np.ndarray, image: np.ndarray, depth_image: np.ndarray, labels: LabelData, frame_id: int = None):
+    def process_frame(self, pointcloud: np.ndarray, image: np.ndarray, depth_image: np.ndarray, labels: LabelData, timestamp: float, frame_id: int = None):
         # Transform pointcloud to kitti coordinate system
         pointcloud = np.column_stack((pointcloud[:, 0], -1 * pointcloud[:, 1], pointcloud[:, 2]))
         T = np.array([
@@ -103,6 +108,7 @@ class KITTIDatasetGenerator:
         self.save_depth_image(depth_image)
         self.save_image(image)
         self.save_label(labels)
+        self.save_timestamp(timestamp)
 
     def set_calibration(self, P2: np.ndarray, Tr_velo_to_cam: np.ndarray):
         self.save_calibration(P2, Tr_velo_to_cam)

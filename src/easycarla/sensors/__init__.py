@@ -3,3 +3,4 @@ from easycarla.sensors.camera_sensor import CameraSensor
 from easycarla.sensors.depth_camera_sensor import DepthCameraSensor
 from easycarla.sensors.lidar_sensor import LidarSensor
 from easycarla.sensors.inseg_camera_sensor import InsegCameraSensor
+from easycarla.sensors.world_sensor import WorldSensor

@@ -100,7 +100,7 @@ class LabelData:
             truncation=np.concatenate((self.truncation, other.truncation), axis=0) if self.truncation is not None and other.truncation is not None else None,
             occlusion=np.concatenate((self.occlusion, other.occlusion), axis=0) if self.occlusion is not None and other.occlusion is not None else None,
             alpha=np.concatenate((self.alpha, other.alpha), axis=0) if self.alpha is not None and other.alpha is not None else None,
-            types=self.types + other.types,
+            types=np.concatenate((self.types, other.types), axis=0) if self.types is not None and other.types is not None else None,
         )
 
     def filter(self, mask: np.ndarray) -> 'LabelData':

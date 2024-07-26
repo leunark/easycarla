@@ -10,13 +10,13 @@ from dataclasses import dataclass, field
 class SpawnManagerConfig:
     seed: int = None
     tm_port: int = 8000
-    respawn_dormant_vehicles: bool = True
+    respawn_dormant_vehicles: bool = False
     hybrid_physics_mode: bool = True
-    hybrid_physics_mode_radius: float = 30.0
-    percentage_pedestrians_crossing: float = 0.3
+    hybrid_physics_mode_radius: float = 50.0
+    percentage_pedestrians_crossing: float = 0.2
     percentage_pedestrians_running: float = 0.05
     percentage_speed_difference: float = 30.0
-    distance_to_leading_vehicle: float = 2.5
+    distance_to_leading_vehicle: float = 3.0
     percentage_vehicles_lights_on: float = 0.5
 
 

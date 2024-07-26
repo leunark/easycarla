@@ -31,7 +31,7 @@ class DisplayManager:
         self.clock = pygame.time.Clock()
         self.font = self.get_font()
 
-        self.sensors: list[tuple[Sensor, tuple[int, int], ScaleMode]] = []
+        self.sensors: list[tuple[Sensor, tuple[int, int, int, int], ScaleMode]] = []
 
     def get_window_size(self):
         return (int(self.window_size[0]), int(self.window_size[1]))
@@ -39,15 +39,23 @@ class DisplayManager:
     def get_display_size(self):
         return (int(self.window_size[0]/self.grid_size[1]), int(self.window_size[1]/self.grid_size[0]))
 
-    def get_display_offset(self, gridPos):
-        dis_size = self.get_display_size()
-        return (int(gridPos[1] * dis_size[0]), int(gridPos[0] * dis_size[1]))
+    def get_display_rect(self, grid_rect: tuple[int, int, int, int]):
+        if grid_rect[0] < 0 or grid_rect[0] + grid_rect[2] > self.grid_size[0] or \
+            grid_rect[1] < 0 or grid_rect[1] + grid_rect[3] > self.grid_size[1]:
+            raise ValueError("Specified grid position lies outside the configured grid size")
+        cell_width, cell_height = (
+            int(self.window_size[0]/self.grid_size[1]), 
+            int(self.window_size[1]/self.grid_size[0]))
+        rect = (
+            int(grid_rect[1] * cell_width),
+            int(grid_rect[0] * cell_height),
+            int(grid_rect[3] * cell_width), 
+            int(grid_rect[2] * cell_height),
+        )
+        return rect
 
-    def add_sensor(self, sensor: Sensor, display_pos: tuple[int, int], scale_mode: ScaleMode = ScaleMode.NORMAL):
-        if display_pos[0] < 0 or display_pos[0] >= self.grid_size[0] or \
-            display_pos[1] < 0 or display_pos[1] >= self.grid_size[1] :
-            raise ValueError(f"Display position {display_pos} not in grid {self.grid_size}")
-        self.sensors.append((sensor, display_pos, scale_mode))
+    def add_sensor(self, sensor: Sensor, grid_rect: tuple[int, int, int, int], scale_mode: ScaleMode = ScaleMode.NORMAL):
+        self.sensors.append((sensor, grid_rect, scale_mode))
 
     def render_enabled(self):
         return self.display != None
@@ -121,17 +129,16 @@ class DisplayManager:
             (8, 28))
 
     def draw_sensors(self):
-        for sensor, display_pos, scale_mode in self.sensors:
+        for sensor, grid_rect, scale_mode in self.sensors:
             img = sensor.preview()
             if img is not None:
                 surface = pygame.surfarray.make_surface(img)
-                self.draw_surface(surface, display_pos, scale_mode)
+                self.draw_surface(surface, grid_rect, scale_mode)
 
-    def draw_surface(self, surface: pygame.Surface, display_pos: tuple[int, int], scale_mode: ScaleMode):
-        display_offset = self.get_display_offset(display_pos)
-        display_size = self.get_display_size()
-        dest_rect = pygame.Rect(*display_offset, *display_size)
-        self.draw_surface_on_surface(surface, self.display, dest_rect, scale_mode)
+    def draw_surface(self, surface: pygame.Surface, grid_rect: tuple[int, int, int, int], scale_mode: ScaleMode):
+        display_rect = self.get_display_rect(grid_rect)
+        display_rect = pygame.Rect(*display_rect)
+        self.draw_surface_on_surface(surface, self.display, display_rect, scale_mode)
 
     @staticmethod
     def draw_surface_on_surface(src_surface: pygame.Surface, dest_surface: pygame.Surface, dest_rect: pygame.Rect, scale_mode: ScaleMode):

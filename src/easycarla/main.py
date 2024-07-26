@@ -27,12 +27,15 @@ fps = 20
 timeout=0.01
 num_vehicles = 30
 num_pedestrians = 40
-seed = 123
-reset = False
+seed = 999
+reset = True
 distance = 50
-show_points = False
+show_points = True
 show_gizmo = False
-output_dir = None #"data/kitti"
+# Set the output_dir to enable data export
+output_dir = "data/kitti"
+# Export every nth frame
+frame_interval = 20
 
 def main():
     simulation_manager = None
@@ -99,10 +102,11 @@ def main():
         # Display Manager organizes all the sensors an its display in a window
         # It is easy to configure the grid and total window size
         # If fps is set here, the framerate will be max locked to it
-        display_manager = DisplayManager(grid_size=[1, 2], fps=fps)
-        display_manager.add_sensor(lidar_sensor, (0, 0), ScaleMode.SCALE_FIT)
-        display_manager.add_sensor(rgb_sensor, (0, 1), ScaleMode.SCALE_FIT)
-        #display_manager.add_sensor(depth_sensor, (2, 0), ScaleMode.ZOOM_CENTER)
+        display_manager = DisplayManager(grid_size=[2, 4], fps=fps)
+        # Grid rect is (row, column, row_offset, column_offset)
+        display_manager.add_sensor(lidar_sensor, grid_rect=(0, 0, 2, 1), scale_mode=ScaleMode.SCALE_FIT)
+        display_manager.add_sensor(rgb_sensor, grid_rect=(1, 1, 1, 3), scale_mode=ScaleMode.ZOOM_CENTER)
+        display_manager.add_sensor(depth_sensor, grid_rect=(0, 1, 1, 3), scale_mode=ScaleMode.ZOOM_CENTER)
 
         sensors: list[Sensor] = [
             rgb_sensor, 
@@ -112,7 +116,6 @@ def main():
 
         # Create label manager for 2d and 3d bounding boxes
         label_manager = LabelManager(
-            world=simulation_manager.world, 
             carla_types={
                 carla.CityObjectLabel.Pedestrians,
                 carla.CityObjectLabel.Car,
@@ -121,12 +124,14 @@ def main():
                 carla.CityObjectLabel.Motorcycle,
                 #carla.CityObjectLabel.Bicycle,
                 carla.CityObjectLabel.Rider}, 
+            world_sensor=world_sensor,
             camera_sensor=rgb_sensor, 
             depth_sensor=depth_sensor, 
             lidar_sensor=lidar_sensor,
             distance=distance,
             show_points=show_points,
-            output_dir=output_dir)
+            output_dir=output_dir,
+            frame_interval=frame_interval)
 
         while True:
             # Carla Tick
@@ -147,7 +152,7 @@ def main():
                                 hero.get_transform().location, 
                                 hero.get_transform().location + hero.get_transform().get_forward_vector(),
                                 thickness=0.1, arrow_size=0.1, color=carla.Color(255,0,0), life_time=10)
-
+        
             # Retrieve bounding boxes
             label_manager.update()
     

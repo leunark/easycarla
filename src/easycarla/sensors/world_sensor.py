@@ -29,4 +29,3 @@ class WorldSensor:
 
     def decode(self, data: carla.WorldSnapshot):
         return None
-

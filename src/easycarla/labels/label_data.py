@@ -1,6 +1,5 @@
 from dataclasses import dataclass
 import numpy as np
-from scipy.spatial.transform import Rotation
 from easycarla.labels.label_types import ObjectType
 
 

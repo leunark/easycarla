@@ -1,17 +1,14 @@
 import carla
-import pygame
 import logging
 import random
 import traceback
-import time
-import cv2
 import numpy as np
 from easycarla.sim.simulation_manager import SimulationManager
 from easycarla.visu.display_manager import DisplayManager, ScaleMode
 from easycarla.sensors import Sensor, CameraSensor, LidarSensor, DepthCameraSensor, MountingDirection, MountingPosition
 from easycarla.sensors.world_sensor import WorldSensor
 from easycarla.sim.spawn_manager import SpawnManager, SpawnManagerConfig
-from easycarla.labels import LabelManager, ObjectType
+from easycarla.labels import LabelManager
 
 logging.basicConfig(level=logging.INFO)
 

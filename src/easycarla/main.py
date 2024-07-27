@@ -28,12 +28,12 @@ timeout=0.01
 num_vehicles = 30
 num_pedestrians = 40
 seed = 999
-reset = True
+reset = False
 distance = 50
 show_points = True
 show_gizmo = False
-# Set the output_dir to enable data export
-output_dir = "data/kitti"
+# Set the output_dir to enable data export or None to disable
+output_dir = None #"data/kitti"
 # Export every nth frame
 frame_interval = 20
 

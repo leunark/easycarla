@@ -76,7 +76,7 @@ class SpawnManager:
         self.traffic_manager.update_vehicle_lights(vehicle, random.uniform() < self.config.percentage_vehicles_lights_on)
         return vehicle
 
-    def spawn_hero(self, filter: str = "vehicle.*"):
+    def spawn_hero(self, filter: str = "vehicle.tesla.model3"):
         if self.hero is not None:
             raise RuntimeError("Hero has been spawned already")
         vehicles = self.spawn_vehicles(1, filter, is_hero=True)
@@ -163,7 +163,7 @@ class SpawnManager:
         for vehicle in self.vehicles:
             if vehicle.is_alive:
                 vehicle.destroy()
-        for controller in self.pedestrian_controllers:
+        for  controller in self.pedestrian_controllers:
             if controller.is_alive:
                 controller.stop()
                 controller.destroy()

@@ -17,6 +17,12 @@ class KITTIDatasetGenerator:
         self.label_dir = self.base_dir / 'label_2'
         self.frame_id = -1
         self.create_directories()
+        self.T = np.array([  # Transformation matrix from CARLA to KITTI
+            [1,  0, 0, 0],
+            [0, -1, 0, 0],
+            [0,  0, 1, 0],
+            [0,  0, 0, 1]
+        ])
 
     def create_directories(self):
         self.depth_camera_dir.mkdir(parents=True, exist_ok=True)
@@ -95,14 +101,8 @@ class KITTIDatasetGenerator:
 
     def process_frame(self, pointcloud: np.ndarray, image: np.ndarray, depth_image: np.ndarray, labels: LabelData, timestamp: float, frame_id: int = None):
         # Transform pointcloud to kitti coordinate system
-        pointcloud = np.column_stack((pointcloud[:, 0], -1 * pointcloud[:, 1], pointcloud[:, 2]))
-        T = np.array([
-            [1,  0, 0, 0],
-            [0, -1, 0, 0],
-            [0,  0, 1, 0],
-            [0,  0, 0, 1]
-        ])
-        labels.apply_transform(T)
+        pointcloud = np.column_stack((pointcloud[:, 0], -1 * pointcloud[:, 1], pointcloud[:, 2], pointcloud[:, 3]))
+        labels.apply_transform(self.T)
         self.frame_id = frame_id if frame_id is not None else self.frame_id + 1
         self.save_point_cloud(pointcloud)
         self.save_depth_image(depth_image)
@@ -111,4 +111,8 @@ class KITTIDatasetGenerator:
         self.save_timestamp(timestamp)
 
     def set_calibration(self, P2: np.ndarray, Tr_velo_to_cam: np.ndarray):
+        # Add a column with zeros to the end of P2 to make it 3x4
+        P2 = np.hstack((P2, np.zeros((3, 1))))
+        # Apply transformation matrix T to Tr_velo_to_cam
+        Tr_velo_to_cam = self.T @ Tr_velo_to_cam
         self.save_calibration(P2, Tr_velo_to_cam)

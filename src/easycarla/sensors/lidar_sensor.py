@@ -44,13 +44,13 @@ class LidarSensor(Sensor):
         lidar_data = np.fabs(lidar_data)
         lidar_data = lidar_data.astype(np.int32)
         lidar_data = np.reshape(lidar_data, (-1, 2))
-        lidar_img_size = (width, height, 3)
+        lidar_img_size = (height, width, 3)
         lidar_img = np.zeros((lidar_img_size), dtype=np.uint8)
         # Transform data to image coordinate system x facing up
-        lidar_data = lidar_data.T[::-1]
-        lidar_data[1] = -lidar_data[1] + min(width, height) - 1
-        lidar_img[tuple(lidar_data)] = (255, 255, 255)
-        return lidar_img 
+        x, y = lidar_data.T
+        x = -x + min(width, height) - 1
+        lidar_img[(x, y)] = (255, 255, 255)
+        return lidar_img
     
     def save(self, file_path: Path) -> None:
         # Ensure the point cloud is a numpy array of type float32

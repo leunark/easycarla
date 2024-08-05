@@ -122,16 +122,18 @@ class DisplayManager:
         fps_simulated = round(1.0 / delta_seconds)
         fps_real = self.clock.get_fps()
         self.display.blit(
-            self.font.render(f'{fps_real} FPS (real)', True, (255, 255, 255)),
+            self.font.render(f'{fps_real:.1f} FPS (real)', True, (255, 255, 255)),
             (8, 10))
         self.display.blit(
-            self.font.render(f'{fps_simulated} FPS (simulated)', True, (255, 255, 255)),
+            self.font.render(f'{fps_simulated:.1f} FPS (simulated)', True, (255, 255, 255)),
             (8, 28))
 
     def draw_sensors(self):
         for sensor, grid_rect, scale_mode in self.sensors:
             img = sensor.preview()
             if img is not None:
+                # Pygame expects the image data to be in the shape (width, height, 3), not (height, width, 3)
+                img = img.swapaxes(0, 1)
                 surface = pygame.surfarray.make_surface(img)
                 self.draw_surface(surface, grid_rect, scale_mode)
 

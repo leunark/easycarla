@@ -1,7 +1,7 @@
 import carla
 import numpy as np
 
-from easycarla.sensors.camera_sensor import CameraSensor, MountingDirection, MountingPosition
+from easycarla.sensors.camera_sensor import CameraSensor
 
 class InsegCameraSensor(CameraSensor):
 

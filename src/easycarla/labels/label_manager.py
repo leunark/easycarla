@@ -1,15 +1,13 @@
 import carla
 import numpy as np
-import logging
 from dataclasses import dataclass
 import cv2 
 from pathlib import Path
 
-from easycarla.sensors import Sensor, CameraSensor, DepthCameraSensor, LidarSensor, InsegCameraSensor, WorldSensor
-from easycarla.labels.label_data import LabelData, ObjectType
+from easycarla.labels.label_data import LabelData
 from easycarla.labels.label_types import map_carla_to_kitti, map_kitti_to_carla
-from easycarla.labels.calib_data import CalibrationData
 from easycarla.labels.kitti import KITTIDatasetGenerator
+from easycarla.sensors import CameraSensor, DepthCameraSensor, LidarSensor, WorldSensor
 from easycarla.tf import Transformation
 
 class LabelManager:
@@ -23,7 +21,11 @@ class LabelManager:
                  distance: float = 50,
                  show_points: bool = False, 
                  output_dir: Path|str = None,
-                 frame_interval: int = 0) -> None:
+                 frame_interval: int = 0,
+                 frame_count = 1000, 
+                 train_ratio = 0.7, 
+                 val_ratio = 0.15, 
+                 test_ratio = 0.15) -> None:
         self.carla_types = carla_types
         self.world_sensor = world_sensor
         self.world = world_sensor.world
@@ -33,7 +35,6 @@ class LabelManager:
         self.distance = distance
         self.show_points = show_points
         self.output_dir = Path(output_dir) if output_dir is not None else None
-        self.frame_interval = frame_interval
 
         self.env_objects: list[carla.EnvironmentObject] = []
         self.actors: list[carla.Actor] = []
@@ -48,7 +49,7 @@ class LabelManager:
         self.lidar_to_camera = world_to_camera @ lidar_to_world
 
         if self.output_dir is not None:
-            self.kitti = KITTIDatasetGenerator(self.output_dir)
+            self.kitti = KITTIDatasetGenerator(self.output_dir, frame_interval, frame_count, train_ratio, val_ratio, test_ratio)
             self.kitti.set_calibration(P2=self.camera_sensor.calibration, Tr_velo_to_cam=self.lidar_to_camera)
 
         self.bbse2d: np.ndarray = None
@@ -144,13 +145,13 @@ class LabelManager:
         
         # Filter initially in world space by distance to reduce bounding boxes
         lidar_pos, lidar_forward = self.lidar_sensor.get_transform()
-        labels.filter_by_distance(distance=self.distance, target=lidar_pos)
+        labels = labels.filter_by_distance(distance=self.distance, target=lidar_pos)
         if len(labels) == 0:
             return
 
         # Transform to sensor coordinate system
         world_to_camera = self.camera_sensor.get_world_to_actor()
-        labels.apply_transform(world_to_camera)
+        labels = labels.apply_transform(world_to_camera)
 
         # Project vertices onto sensor
         bbs3d = labels.vertices
@@ -166,7 +167,7 @@ class LabelManager:
 
         # Remove fully truncated bounding boxes
         mask_not_fully_truncated = labels.truncation < 1.0
-        labels.filter(mask_not_fully_truncated)
+        labels = labels.filter(mask_not_fully_truncated)
         bbsv2d = bbsv2d[mask_not_fully_truncated]
         bbsv2d_depth = bbsv2d_depth[mask_not_fully_truncated]
         mask_within_image = mask_within_image[mask_not_fully_truncated]
@@ -184,7 +185,7 @@ class LabelManager:
 
         # Remove fully occluded bounding boxes
         mask_not_fully_occluded = labels.occlusion < 1.0
-        labels.filter(mask_not_fully_occluded)
+        labels = labels.filter(mask_not_fully_occluded)
         bbsv2d = bbsv2d[mask_not_fully_occluded]
         bbsv2d_depth = bbsv2d_depth[mask_not_fully_occluded]
 
@@ -196,15 +197,14 @@ class LabelManager:
 
         # Generate dataset
         if self.output_dir is not None:
+            timestamp = self.world_sensor.sensor_data.timestamp.elapsed_seconds 
             frame = self.world_sensor.sensor_data.frame
-            if frame % self.frame_interval == 0:
-                timestamp = self.world_sensor.sensor_data.timestamp.elapsed_seconds 
-                self.kitti.process_frame(pointcloud=self.lidar_sensor.pointcloud, 
-                                        image=self.camera_sensor.rgb_image, 
-                                        depth_image=self.depth_sensor.rgb_image, 
-                                        labels=self.labels,
-                                        timestamp=timestamp,
-                                        frame_id=frame)
+            self.kitti.process_frame(pointcloud=self.lidar_sensor.pointcloud, 
+                                    image=self.camera_sensor.rgb_image, 
+                                    depth_image=self.depth_sensor.rgb_image, 
+                                    labels=self.labels,
+                                    timestamp=timestamp,
+                                    world_frame_id=frame)
 
         # Retrieve pointcloud & draw onto image
         if self.show_points:

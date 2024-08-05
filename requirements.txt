@@ -1,7 +1,0 @@
-carla
-networkx
-numpy
-distro
-Shapely
-open3d
-matplotlib

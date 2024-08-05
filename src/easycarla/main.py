@@ -3,11 +3,10 @@ import logging
 import random
 import traceback
 import numpy as np
-from easycarla.sim.simulation_manager import SimulationManager
-from easycarla.visu.display_manager import DisplayManager, ScaleMode
-from easycarla.sensors import Sensor, CameraSensor, LidarSensor, DepthCameraSensor, MountingDirection, MountingPosition
-from easycarla.sensors.world_sensor import WorldSensor
-from easycarla.sim.spawn_manager import SpawnManager, SpawnManagerConfig
+from easycarla.sim import SimulationManager
+from easycarla.visu import DisplayManager, ScaleMode
+from easycarla.sensors import Sensor, CameraSensor, LidarSensor, DepthCameraSensor, MountingDirection, MountingPosition, WorldSensor
+from easycarla.sim import SpawnManager, SpawnManagerConfig
 from easycarla.labels import LabelManager
 
 logging.basicConfig(level=logging.INFO)
@@ -18,21 +17,25 @@ np.set_printoptions(suppress=True)
 host = '127.0.0.1'
 port = 2000
 client_timeout = 60
-sync = True
-fixed_delta_seconds = 0.05
-fps = 20
-timeout=0.01
+sync = True # Enables synchronized world with ticking client
+fixed_delta_seconds = 0.05 # Time of a simulation step
+fps = 20 # Max number of real time frames per seconds
+timeout = 0.01 
 num_vehicles = 30
 num_pedestrians = 40
-seed = 999
-reset = False
-distance = 50
-show_points = True
-show_gizmo = False
-# Set the output_dir to enable data export or None to disable
-output_dir = None #"data/kitti"
-# Export every nth frame
-frame_interval = 20
+seed = 999 
+reset = False # Should reset simulation first
+distance = 50 # Distance of the labels that will be considered
+show_points = True # This will only affect visualization
+show_gizmo = False # Marks the vehicle in the 3d scene to find it easier
+
+output_dir = "data/kitti" # Set the output_dir to enable data export or None to disable
+frame_interval = 20 # Export every nth frame
+frame_count = 100
+train_ratio = 0.7
+val_ratio = 0.15
+test_ratio = 0.15
+
 
 def main():
     simulation_manager = None
@@ -58,7 +61,7 @@ def main():
         spawn_manager.spawn_vehicles(num_vehicles)
         spawn_manager.spawn_pedestrians(num_pedestrians)
 
-        # Choose hero vehicle
+        # Spawn hero vehicle
         hero = spawn_manager.spawn_hero()
         
         # Spawn sensors
@@ -119,7 +122,7 @@ def main():
                 carla.CityObjectLabel.Bus,
                 carla.CityObjectLabel.Truck,
                 carla.CityObjectLabel.Motorcycle,
-                #carla.CityObjectLabel.Bicycle,
+                #carla.CityObjectLabel.Bicycle, # Bicycle bounding boxes are buggy
                 carla.CityObjectLabel.Rider}, 
             world_sensor=world_sensor,
             camera_sensor=rgb_sensor, 
@@ -128,7 +131,11 @@ def main():
             distance=distance,
             show_points=show_points,
             output_dir=output_dir,
-            frame_interval=frame_interval)
+            frame_interval=frame_interval,
+            frame_count=frame_count,
+            train_ratio=train_ratio,
+            val_ratio=val_ratio,
+            test_ratio=test_ratio)
 
         while True:
             # Carla Tick

@@ -1,7 +1,6 @@
 import carla
 import queue
 import logging
-import numpy as np
 
 class WorldSensor:
 

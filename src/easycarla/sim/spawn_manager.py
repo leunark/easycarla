@@ -1,8 +1,6 @@
-import os
 import logging
 from numpy import random
 import carla
-from pathlib import Path
 from dataclasses import dataclass, field
 
 

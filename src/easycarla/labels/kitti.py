@@ -1,21 +1,27 @@
-import os
 import numpy as np
+import logging
 import cv2
 from pathlib import Path
-
+from tqdm import tqdm
 from easycarla.labels.label_data import LabelData
-from easycarla.labels.label_types import ObjectType
-from easycarla.sensors import LidarSensor, CameraSensor, DepthCameraSensor
 
 class KITTIDatasetGenerator:
-    def __init__(self, base_dir: Path|str):
+    def __init__(self, base_dir: Path|str, frame_interval = 1, frame_count = 1000, train_ratio = 0.7, val_ratio = 0.15, test_ratio = 0.15):
         self.base_dir = Path(base_dir)
+        self.frame_interval = frame_interval
+        self.train_ratio = train_ratio
+        self.val_ratio = val_ratio
+        self.test_ratio = test_ratio
+        self.frame_count = frame_count
+
         self.depth_camera_dir = self.base_dir / 'image_1'
         self.camera_dir = self.base_dir / 'image_2'
         self.velodyne_dir = self.base_dir / 'velodyne'
         self.calib_dir = self.base_dir / 'calib'
         self.label_dir = self.base_dir / 'label_2'
-        self.frame_id = -1
+        self.image_sets_dir = self.base_dir / 'ImageSets'
+
+        self.frame_id = 0
         self.create_directories()
         self.T = np.array([  # Transformation matrix from CARLA to KITTI
             [1,  0, 0, 0],
@@ -23,6 +29,7 @@ class KITTIDatasetGenerator:
             [0,  0, 1, 0],
             [0,  0, 0, 1]
         ])
+        self.pbar = tqdm(total=frame_count)
 
     def create_directories(self):
         self.depth_camera_dir.mkdir(parents=True, exist_ok=True)
@@ -30,6 +37,7 @@ class KITTIDatasetGenerator:
         self.velodyne_dir.mkdir(parents=True, exist_ok=True)
         self.calib_dir.mkdir(parents=True, exist_ok=True)
         self.label_dir.mkdir(parents=True, exist_ok=True)
+        self.image_sets_dir.mkdir(parents=True, exist_ok=True)
 
     def save_depth_image(self, image: np.ndarray):
         image_path = self.depth_camera_dir / f'{self.frame_id:06}.png'
@@ -70,6 +78,18 @@ class KITTIDatasetGenerator:
             for i in range(len(labels.id)):
                 f.write(self.format_label(labels, i))
 
+    def save_frame_id(self):
+        rand = np.random.random()
+        if rand < self.train_ratio:
+            set_name = 'train'
+        elif rand < self.train_ratio + self.val_ratio:
+            set_name = 'val'
+        elif rand < self.train_ratio + self.val_ratio + self.test_ratio:
+            set_name = 'test'
+        frame_path = self.image_sets_dir / f'{set_name}.txt'
+        with frame_path.open('a') as f:
+            f.write(f"{self.frame_id:06}\n")
+
     def format_label(self, labels: LabelData, index: int):
         bbox = labels.transform[index][:3, 3]  # Assuming this is the bounding box location in the form of [x, y, z]
         dimension = labels.dimension[index]
@@ -99,16 +119,30 @@ class KITTIDatasetGenerator:
         label_str += f"{yaw_angle}\n"
         return label_str
 
-    def process_frame(self, pointcloud: np.ndarray, image: np.ndarray, depth_image: np.ndarray, labels: LabelData, timestamp: float, frame_id: int = None):
+    def process_frame(self, pointcloud: np.ndarray, image: np.ndarray, depth_image: np.ndarray, labels: LabelData, timestamp: float, world_frame_id: int):
+        if world_frame_id % self.frame_interval != 0:
+            return
+        if self.frame_id == self.frame_count:
+            self.pbar.close()
+            logging.info(f"Finished dataset with {self.frame_count} samples!")
+            self.frame_id = self.frame_id + 1
+            return
+        if self.frame_id > self.frame_count:
+            return
+        
         # Transform pointcloud to kitti coordinate system
         pointcloud = np.column_stack((pointcloud[:, 0], -1 * pointcloud[:, 1], pointcloud[:, 2], pointcloud[:, 3]))
-        labels.apply_transform(self.T)
-        self.frame_id = frame_id if frame_id is not None else self.frame_id + 1
+        # Same for labels
+        labels = labels.apply_transform(self.T)
         self.save_point_cloud(pointcloud)
         self.save_depth_image(depth_image)
         self.save_image(image)
         self.save_label(labels)
         self.save_timestamp(timestamp)
+        self.save_frame_id()
+
+        self.pbar.update()
+        self.frame_id = self.frame_id + 1
 
     def set_calibration(self, P2: np.ndarray, Tr_velo_to_cam: np.ndarray):
         # Add a column with zeros to the end of P2 to make it 3x4

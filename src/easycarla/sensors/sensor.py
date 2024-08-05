@@ -2,11 +2,8 @@ from pathlib import Path
 from enum import Enum
 from abc import ABC, abstractmethod
 import queue
-import time
 import numpy as np
 import carla
-import pygame
-import cv2
 import logging
 
 from easycarla.tf import Transformation

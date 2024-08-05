@@ -1,7 +1,7 @@
 import carla
 import numpy as np
 
-from easycarla.sensors.camera_sensor import CameraSensor, MountingDirection, MountingPosition
+from easycarla.sensors.camera_sensor import CameraSensor
 
 class DepthCameraSensor(CameraSensor):
 
@@ -14,7 +14,6 @@ class DepthCameraSensor(CameraSensor):
         return bp
 
     def decode(self, data: carla.SensorData) -> None:
-        data.convert(carla.ColorConverter.Depth)
         super().decode(data)
 
         # Read the R, G, and B channels
@@ -30,3 +29,23 @@ class DepthCameraSensor(CameraSensor):
 
         self.depth_values = depth_in_meters
     
+    def preview(self) -> np.ndarray:
+        # Define the custom colormap from value range [0,1]
+        # a < 0
+        def custom_colormap(value: np.ndarray, skew: float = 50.0):
+            # Apply 1/x transformation
+            a = -1/skew
+            b = -0.5 + (0.25 - a)**0.5
+            c = -a/b
+            y = a/(value+b)+c
+
+            # Vectorized approach to create the colormap
+            r = y
+            g = np.zeros_like(y)
+            b = 1 - y
+            rgb = (np.stack((r, g, b), axis=-1) * 255).astype(np.uint8)
+            return rgb
+        
+        # Apply the custom colormap to the normalized depth values
+        img = custom_colormap(self.depth_values / 1000)
+        return img

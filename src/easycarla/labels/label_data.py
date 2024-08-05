@@ -1,7 +1,6 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 import numpy as np
 from easycarla.labels.label_types import ObjectType
-
 
 @dataclass
 class LabelData:
@@ -42,11 +41,10 @@ class LabelData:
     ])
 
     # Add extra vertices along each edge to improve occlusion calculation
-    # A subdivsion count of two adds one extra vertex because it subdivides
+    # A subdivision count of two adds one extra vertex because it subdivides
     # the edge into two parts
     SUBDIVISION_COUNT = 3
 
-    
     @property
     def position(self) -> np.ndarray:
         return self.transform[:, :3, 3]
@@ -59,14 +57,14 @@ class LabelData:
     def vertices(self) -> np.ndarray:
         # Add extra verts on diagonals
         unit_box = self.UNIT_BOX
-        exra_verts = []
+        extra_verts = []
         lines = self.DIAG_INDICES
         for i, j in lines:
             for k in range(1, self.SUBDIVISION_COUNT):
                 v = unit_box[i] + (unit_box[j] - unit_box[i]) / self.SUBDIVISION_COUNT * k
-                exra_verts.append(v)
-        exra_verts = np.array(exra_verts)
-        unit_box = np.vstack((unit_box, exra_verts))
+                extra_verts.append(v)
+        extra_verts = np.array(extra_verts)
+        unit_box = np.vstack((unit_box, extra_verts))
 
         # Scale the unit box by the dimensions
         # unit_box: Broadcasting across multiple objects
@@ -103,14 +101,15 @@ class LabelData:
         )
 
     def filter(self, mask: np.ndarray) -> 'LabelData':
-        self.id = self.id[mask]
-        self.transform = self.transform[mask]
-        self.dimension = self.dimension[mask]
-        self.types = [self.types[i] for i in np.nonzero(mask)[0]]
-        if self.truncation is not None: self.truncation = self.truncation[mask]
-        if self.occlusion is not None: self.occlusion = self.occlusion[mask]
-        if self.alpha is not None: self.alpha = self.alpha[mask]
-        return self
+        return LabelData(
+            id=self.id[mask],
+            transform=self.transform[mask],
+            dimension=self.dimension[mask],
+            types=[self.types[i] for i in np.nonzero(mask)[0]],
+            truncation=self.truncation[mask] if self.truncation is not None else None,
+            occlusion=self.occlusion[mask] if self.occlusion is not None else None,
+            alpha=self.alpha[mask] if self.alpha is not None else None,
+        )
 
     def filter_by_distance(self, distance: float, target: np.ndarray = None) -> 'LabelData':
         target = target if target is not None else np.zeros(3)
@@ -127,15 +126,15 @@ class LabelData:
         mask = np.dot(delta_pos_unit, forward) > dot_threshold
         return self.filter(mask)
     
-    def filter_by_id(self, ids: np.ndarray):
+    def filter_by_id(self, ids: np.ndarray) -> 'LabelData':
         mask = np.isin(self.id, ids)
         return self.filter(mask)
 
     def apply_transform(self, matrix: np.ndarray) -> 'LabelData':
-        self.transform = np.einsum('ij,njk->nik', matrix, self.transform)
-        return self
+        new_transform = np.einsum('ij,njk->nik', matrix, self.transform)
+        return replace(self, transform=new_transform)
 
-    def get_alpha(self, target: np.ndarray = None, forward: np.ndarray = None):
+    def get_alpha(self, target: np.ndarray = None, forward: np.ndarray = None) -> np.ndarray:
         target = target if target is not None else np.zeros(3)
         forward = forward if forward is not None else np.array([1, 0, 0])
 

@@ -8,34 +8,36 @@ from easycarla.visu import DisplayManager, ScaleMode
 from easycarla.sensors import Sensor, CameraSensor, LidarSensor, DepthCameraSensor, MountingDirection, MountingPosition, WorldSensor
 from easycarla.sim import SpawnManager, SpawnManagerConfig
 from easycarla.labels import LabelManager
+import argparse
 
 logging.basicConfig(level=logging.INFO)
 
 # Enable human readable numpy output for debugging
 np.set_printoptions(suppress=True)
 
-host = '127.0.0.1'
-port = 2000
-client_timeout = 60
-sync = True # Enables synchronized world with ticking client
-fixed_delta_seconds = 0.05 # Time of a simulation step
-fps = 20 # Max number of real time frames per seconds
-timeout = 0.01 
-num_vehicles = 30
-num_pedestrians = 40
-seed = 999 
-reset = False # Should reset simulation first
-distance = 50 # Distance of the labels that will be considered
-show_points = True # This will only affect visualization
-show_gizmo = False # Marks the vehicle in the 3d scene to find it easier
-
-output_dir = "data/kitti" # Set the output_dir to enable data export or None to disable
-frame_interval = 20 # Export every nth frame
-frame_count = 100
-train_ratio = 0.7
-val_ratio = 0.15
-test_ratio = 0.15
-
+def parse_args():
+    parser = argparse.ArgumentParser(description="CARLA simulation script with adjustable parameters")
+    parser.add_argument('--host', type=str, default='127.0.0.1', help='Host IP address')
+    parser.add_argument('--port', type=int, default=2000, help='Port number')
+    parser.add_argument('--client_timeout', type=int, default=60, help='Client timeout in seconds')
+    parser.add_argument('--sync', type=bool, default=True, help='Enable synchronous mode')
+    parser.add_argument('--fixed_delta_seconds', type=float, default=0.05, help='Fixed delta seconds')
+    parser.add_argument('--fps', type=int, default=20, help='Frames per second')
+    parser.add_argument('--timeout', type=float, default=0.01, help='Timeout')
+    parser.add_argument('--num_vehicles', type=int, default=30, help='Number of vehicles')
+    parser.add_argument('--num_pedestrians', type=int, default=40, help='Number of pedestrians')
+    parser.add_argument('--seed', type=int, default=999, help='Random seed')
+    parser.add_argument('--reset', type=bool, default=False, help='Reset simulation')
+    parser.add_argument('--distance', type=int, default=50, help='Distance for labels')
+    parser.add_argument('--show_points', type=bool, default=True, help='Show points in visualization')
+    parser.add_argument('--show_gizmo', type=bool, default=False, help='Show gizmo')
+    parser.add_argument('--output_dir', type=str, default="data/kitti", help='Output directory')
+    parser.add_argument('--frame_interval', type=int, default=20, help='Frame interval for export')
+    parser.add_argument('--frame_count', type=int, default=100, help='Number of frames to export')
+    parser.add_argument('--train_ratio', type=float, default=0.7, help='Train ratio')
+    parser.add_argument('--val_ratio', type=float, default=0.15, help='Validation ratio')
+    parser.add_argument('--test_ratio', type=float, default=0.15, help='Test ratio')
+    return parser.parse_args()
 
 def main():
     simulation_manager = None

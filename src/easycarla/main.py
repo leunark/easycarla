@@ -40,6 +40,8 @@ def parse_args():
     return parser.parse_args()
 
 def main():
+    args = parse_args()
+
     simulation_manager = None
     spawn_manager = None
     display_manager = None
@@ -47,21 +49,21 @@ def main():
 
     try:
         # Set seed for deterministic random
-        random.seed(seed)
+        random.seed(args.seed)
 
         # Setup simulation
         simulation_manager = SimulationManager(
-            host=host,
-            port=port,
-            timeout=client_timeout,
-            sync=sync, 
-            fixed_delta_seconds=fixed_delta_seconds,
-            reset=reset)
+            host=args.host,
+            port=args.port,
+            timeout=args.client_timeout,
+            sync=args.sync, 
+            fixed_delta_seconds=args.fixed_delta_seconds,
+            reset=args.reset)
         
         # The, we can start our spawn manager to spawn vehicles before the simulation loop
-        spawn_manager = SpawnManager(simulation_manager.client, SpawnManagerConfig(seed=seed))
-        spawn_manager.spawn_vehicles(num_vehicles)
-        spawn_manager.spawn_pedestrians(num_pedestrians)
+        spawn_manager = SpawnManager(simulation_manager.client, SpawnManagerConfig(seed=args.seed))
+        spawn_manager.spawn_vehicles(args.num_vehicles)
+        spawn_manager.spawn_pedestrians(args.num_pedestrians)
 
         # Spawn hero vehicle
         hero = spawn_manager.spawn_hero()
@@ -94,7 +96,7 @@ def main():
                 'channels' : '64', 
                 'range' : '120',  
                 'points_per_second': '1300000', 
-                'rotation_frequency': str(1/fixed_delta_seconds), 
+                'rotation_frequency': str(1/args.fixed_delta_seconds), 
                 'sensor_tick': '0',
             })
         
@@ -130,14 +132,14 @@ def main():
             camera_sensor=rgb_sensor, 
             depth_sensor=depth_sensor, 
             lidar_sensor=lidar_sensor,
-            distance=distance,
-            show_points=show_points,
-            output_dir=output_dir,
-            frame_interval=frame_interval,
-            frame_count=frame_count,
-            train_ratio=train_ratio,
-            val_ratio=val_ratio,
-            test_ratio=test_ratio)
+            distance=args.distance,
+            show_points=args.show_points,
+            output_dir=args.output_dir,
+            frame_interval=args.frame_interval,
+            frame_count=args.frame_count,
+            train_ratio=args.train_ratio,
+            val_ratio=args.val_ratio,
+            test_ratio=args.test_ratio)
 
         while True:
             # Carla Tick
@@ -153,7 +155,7 @@ def main():
                 logging.warning(f"Failed to consume on frame {world_snapshot.frame}")
             
             # Gizmo on hero vehicle
-            if show_gizmo:
+            if args.show_gizmo:
                 world_sensor.world.debug.draw_arrow(
                                 hero.get_transform().location, 
                                 hero.get_transform().location + hero.get_transform().get_forward_vector(),

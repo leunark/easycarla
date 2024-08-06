@@ -11,7 +11,6 @@ class LabelData:
     types: list[set[ObjectType]]
     truncation: np.ndarray = None
     occlusion: np.ndarray = None
-    alpha: np.ndarray = None
 
     # Define the 12 edges of a cube by vertex indices
     EDGE_INDICES = np.array([
@@ -96,7 +95,6 @@ class LabelData:
             dimension=np.concatenate((self.dimension, other.dimension), axis=0),
             truncation=np.concatenate((self.truncation, other.truncation), axis=0) if self.truncation is not None and other.truncation is not None else None,
             occlusion=np.concatenate((self.occlusion, other.occlusion), axis=0) if self.occlusion is not None and other.occlusion is not None else None,
-            alpha=np.concatenate((self.alpha, other.alpha), axis=0) if self.alpha is not None and other.alpha is not None else None,
             types=np.concatenate((self.types, other.types), axis=0) if self.types is not None and other.types is not None else None,
         )
 
@@ -105,10 +103,9 @@ class LabelData:
             id=self.id[mask],
             transform=self.transform[mask],
             dimension=self.dimension[mask],
-            types=[self.types[i] for i in np.nonzero(mask)[0]],
             truncation=self.truncation[mask] if self.truncation is not None else None,
             occlusion=self.occlusion[mask] if self.occlusion is not None else None,
-            alpha=self.alpha[mask] if self.alpha is not None else None,
+            types=[self.types[i] for i in np.nonzero(mask)[0]],
         )
 
     def filter_by_distance(self, distance: float, target: np.ndarray = None) -> 'LabelData':

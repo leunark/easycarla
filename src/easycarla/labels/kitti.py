@@ -108,11 +108,12 @@ class KITTIDatasetGenerator:
         # 3: Unknown level of occlusion
         else:
             occlusion_level = 3
-            
+
+        alpha = labels.get_alpha()
         label_str = f"{next(iter(labels.types[index])).value} "
         label_str += f"{labels.truncation[index] if labels.truncation is not None else 0} "
         label_str += f"{occlusion_level} " 
-        label_str += f"{labels.alpha[index] if labels.alpha is not None else 0} "
+        label_str += f"{alpha[index] if alpha is not None else 0} "
         label_str += f"{-1} {-1} {-1} {-1} "
         label_str += f"{dimension[0]} {dimension[1]} {dimension[2]} "
         label_str += f"{bbox[0]} {bbox[1]} {bbox[2]} "

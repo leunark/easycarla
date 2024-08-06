@@ -189,9 +189,6 @@ class LabelManager:
         bbsv2d = bbsv2d[mask_not_fully_occluded]
         bbsv2d_depth = bbsv2d_depth[mask_not_fully_occluded]
 
-        # Calculate alpha in camera space
-        labels.alpha = labels.get_alpha()
-
         # Now, we have our final label data
         self.labels = labels
 

@@ -106,7 +106,7 @@ def main():
         # Display Manager organizes all the sensors an its display in a window
         # It is easy to configure the grid and total window size
         # If fps is set here, the framerate will be max locked to it
-        display_manager = DisplayManager(grid_size=[2, 4], fps=fps)
+        display_manager = DisplayManager(grid_size=[2, 4], fps=args.fps)
         # Grid rect is (row, column, row_offset, column_offset)
         display_manager.add_sensor(lidar_sensor, grid_rect=(0, 0, 2, 1), scale_mode=ScaleMode.SCALE_FIT)
         display_manager.add_sensor(rgb_sensor, grid_rect=(1, 1, 1, 3), scale_mode=ScaleMode.ZOOM_CENTER)

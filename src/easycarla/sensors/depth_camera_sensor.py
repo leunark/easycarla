@@ -4,16 +4,33 @@ import numpy as np
 from easycarla.sensors.camera_sensor import CameraSensor
 
 class DepthCameraSensor(CameraSensor):
+    """
+    Class for depth camera sensor.
 
+    Attributes:
+        depth_values (np.ndarray): Depth values array.
+    """
     depth_values: np.ndarray = None
 
     def create_blueprint(self) -> carla.ActorBlueprint:
+        """
+        Create the blueprint for the depth camera sensor.
+
+        Returns:
+            carla.ActorBlueprint: Depth camera sensor blueprint.
+        """
         bp = self.world.get_blueprint_library().find('sensor.camera.depth')
         bp.set_attribute('image_size_x', str(self.image_size[0]))
         bp.set_attribute('image_size_y', str(self.image_size[1]))
         return bp
 
     def decode(self, data: carla.SensorData) -> None:
+        """
+        Decode the sensor data into depth values.
+
+        Args:
+            data (carla.SensorData): Sensor data.
+        """
         super().decode(data)
 
         # Read the R, G, and B channels
@@ -30,6 +47,12 @@ class DepthCameraSensor(CameraSensor):
         self.depth_values = depth_in_meters
     
     def preview(self) -> np.ndarray:
+        """
+        Get the preview image with custom colormap applied.
+
+        Returns:
+            np.ndarray: Preview image array.
+        """
         # Define the custom colormap from value range [0,1]
         # a < 0
         def custom_colormap(value: np.ndarray, skew: float = 50.0):

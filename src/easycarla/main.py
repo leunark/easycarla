@@ -16,6 +16,12 @@ logging.basicConfig(level=logging.INFO)
 np.set_printoptions(suppress=True)
 
 def parse_args():
+    """
+    Parse command line arguments for the CARLA simulation script.
+
+    Returns:
+        argparse.Namespace: Parsed command line arguments.
+    """
     parser = argparse.ArgumentParser(description="CARLA simulation script with adjustable parameters")
     parser.add_argument('--host', type=str, default='127.0.0.1', help='Host IP address')
     parser.add_argument('--port', type=int, default=2000, help='Port number')
@@ -40,6 +46,9 @@ def parse_args():
     return parser.parse_args()
 
 def main():
+    """
+    Main function to set up and run the CARLA simulation with adjustable parameters.
+    """
     args = parse_args()
 
     simulation_manager = None

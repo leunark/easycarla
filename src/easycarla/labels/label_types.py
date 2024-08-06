@@ -13,6 +13,15 @@ class ObjectType(Enum):
     DONT_CARE = "DontCare"
 
 def map_carla_to_kitti(carla_label: carla.CityObjectLabel) -> ObjectType:
+    """
+    Map CARLA labels to KITTI labels.
+
+    Args:
+        carla_label (carla.CityObjectLabel): CARLA label.
+
+    Returns:
+        ObjectType: KITTI object type.
+    """
     mapping = {
         carla.CityObjectLabel.Buildings: ObjectType.DONT_CARE,
         carla.CityObjectLabel.Fences: ObjectType.DONT_CARE,
@@ -47,6 +56,15 @@ def map_carla_to_kitti(carla_label: carla.CityObjectLabel) -> ObjectType:
     return mapping.get(carla_label, ObjectType.DONT_CARE)
 
 def map_kitti_to_carla(kitti_type: ObjectType) -> carla.CityObjectLabel:
+    """
+    Map KITTI labels to CARLA labels.
+
+    Args:
+        kitti_type (ObjectType): KITTI object type.
+
+    Returns:
+        carla.CityObjectLabel: CARLA label.
+    """
     mapping = {
         ObjectType.CAR: carla.CityObjectLabel.Car,
         ObjectType.VAN: carla.CityObjectLabel.Bus,  # Assuming Van maps to Bus in Carla

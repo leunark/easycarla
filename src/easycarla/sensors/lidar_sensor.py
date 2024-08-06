@@ -5,6 +5,13 @@ import numpy as np
 from easycarla.sensors.sensor import Sensor, MountingDirection, MountingPosition
 
 class LidarSensor(Sensor):
+    """
+    Class for LiDAR sensor.
+
+    Attributes:
+        range (float): Range of the LiDAR sensor.
+        pointcloud (np.ndarray): Point cloud array.
+    """
 
     def __init__(self, 
                  world: carla.World, 
@@ -20,6 +27,12 @@ class LidarSensor(Sensor):
         self.pointcloud = None
 
     def create_blueprint(self) -> carla.ActorBlueprint:
+        """
+        Create the blueprint for the LiDAR sensor.
+
+        Returns:
+            carla.ActorBlueprint: LiDAR sensor blueprint.
+        """
         bp = self.world.get_blueprint_library().find('sensor.lidar.ray_cast')
         bp.set_attribute('range', '100')
         bp.set_attribute('dropoff_general_rate', bp.get_attribute('dropoff_general_rate').recommended_values[0])
@@ -28,11 +41,23 @@ class LidarSensor(Sensor):
         return bp
 
     def decode(self, data: carla.LidarMeasurement) -> None:
+        """
+        Decode the sensor data into a point cloud.
+
+        Args:
+            data (carla.LidarMeasurement): Sensor data.
+        """
         points = np.frombuffer(data.raw_data, dtype=np.dtype('f4'))
         points = np.reshape(points, (int(points.shape[0] / 4), 4))
         self.pointcloud = points
 
     def preview(self) -> np.ndarray:
+        """
+        Get the preview image of the point cloud.
+
+        Returns:
+            np.ndarray: Preview image array.
+        """
         # Take xy plane and scale to display size
         width, height = self.image_size
         points = self.pointcloud
@@ -53,6 +78,12 @@ class LidarSensor(Sensor):
         return lidar_img
     
     def save(self, file_path: Path) -> None:
+        """
+        Save the point cloud to file.
+
+        Args:
+            file_path (Path): File path to save the point cloud.
+        """
         # Ensure the point cloud is a numpy array of type float32
         point_cloud = self.pointcloud.astype(np.float32)
         

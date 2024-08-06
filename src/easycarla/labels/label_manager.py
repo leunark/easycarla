@@ -11,7 +11,24 @@ from easycarla.sensors import CameraSensor, DepthCameraSensor, LidarSensor, Worl
 from easycarla.tf import Transformation
 
 class LabelManager:
+    """
+    Class to manage labels for objects in the CARLA simulation.
 
+    Attributes:
+        carla_types (set[carla.CityObjectLabel]): Set of CARLA object types to label.
+        world_sensor (WorldSensor): World sensor object.
+        camera_sensor (CameraSensor): Camera sensor object.
+        depth_sensor (DepthCameraSensor): Depth camera sensor object.
+        lidar_sensor (LidarSensor): LiDAR sensor object.
+        distance (float): Maximum distance for labels.
+        show_points (bool): Whether to show points in visualization.
+        output_dir (Path|str): Directory to save output data.
+        frame_interval (int): Interval of frames to process.
+        frame_count (int): Number of frames to process.
+        train_ratio (float): Ratio of training data.
+        val_ratio (float): Ratio of validation data.
+        test_ratio (float): Ratio of test data.
+    """
     def __init__(self, 
                  carla_types: set[carla.CityObjectLabel],
                  world_sensor: WorldSensor,
@@ -58,6 +75,7 @@ class LabelManager:
         self.init_objects()
 
     def init_objects(self):
+        """Initialize environment objects and actors."""
         # Retrieve and store bounding boxes for environmental objects
         for carla_type in self.carla_types:
             self.env_objects.extend(self.world.get_environment_objects(carla_type))
@@ -72,6 +90,12 @@ class LabelManager:
             self.actors = [a for a in self.actors if a.id != self.ego_vehicle.id]
 
     def create_env_labels(self) -> LabelData:
+        """
+        Create labels for environment objects.
+
+        Returns:
+            LabelData: Label data for environment objects.
+        """
         env_objects = self.env_objects
         # Extract transformations and types
         id_list = np.array([int(obj.id) for obj in env_objects])
@@ -100,6 +124,12 @@ class LabelManager:
         )
 
     def create_actor_labels(self) -> LabelData:
+        """
+        Create labels for actors.
+
+        Returns:
+            LabelData: Label data for actors.
+        """
         id = []
         transform = [] 
         dimension = []
@@ -133,6 +163,7 @@ class LabelManager:
         )
     
     def update(self):
+        """Update labels and generate dataset if needed."""
         # First retrieve labels in world space
         if self.env_labels is None:
             self.env_labels = self.create_env_labels()

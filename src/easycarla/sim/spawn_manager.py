@@ -6,6 +6,21 @@ from dataclasses import dataclass, field
 
 @dataclass
 class SpawnManagerConfig:
+    """
+    Configuration class for the spawn manager.
+
+    Attributes:
+        seed (int): Random seed.
+        tm_port (int): Traffic manager port.
+        respawn_dormant_vehicles (bool): Whether to respawn dormant vehicles.
+        hybrid_physics_mode (bool): Whether to enable hybrid physics mode.
+        hybrid_physics_mode_radius (float): Radius for hybrid physics mode.
+        percentage_pedestrians_crossing (float): Percentage of pedestrians crossing.
+        percentage_pedestrians_running (float): Percentage of pedestrians running.
+        percentage_speed_difference (float): Percentage speed difference.
+        distance_to_leading_vehicle (float): Distance to leading vehicle.
+        percentage_vehicles_lights_on (float): Percentage of vehicles with lights on.
+    """
     seed: int = None
     tm_port: int = 8000
     respawn_dormant_vehicles: bool = False
@@ -19,7 +34,22 @@ class SpawnManagerConfig:
 
 
 class SpawnManager:
+    """
+    Class to manage the spawning of vehicles and pedestrians in the CARLA simulation.
 
+    Attributes:
+        client (carla.Client): CARLA client object.
+        config (SpawnManagerConfig): Configuration for the spawn manager.
+        hero (carla.Actor): Hero vehicle actor.
+        vehicles (list[carla.Actor]): List of spawned vehicle actors.
+        pedestrians (list[carla.Actor]): List of spawned pedestrian actors.
+        pedestrian_controllers (list[carla.Actor]): List of pedestrian controllers.
+        world (carla.World): CARLA world object.
+        sync (bool): Whether to enable synchronous mode.
+        traffic_manager (carla.TrafficManager): Traffic manager object.
+        vehicle_blueprint_library (carla.BlueprintLibrary): Vehicle blueprint library.
+        pedestrian_blueprint_library (carla.BlueprintLibrary): Pedestrian blueprint library.
+    """
     def __init__(self, client: carla.Client, config: SpawnManagerConfig) -> None:
         self.client = client
         self.config = config
@@ -54,6 +84,17 @@ class SpawnManager:
         self.pedestrian_blueprint_library = self.world.get_blueprint_library().filter('walker.pedestrian.*')
  
     def spawn_vehicle(self, blueprint: carla.ActorBlueprint, spawn_point: carla.Transform, is_hero: bool = False):
+        """
+        Spawn a vehicle in the simulation.
+
+        Args:
+            blueprint (carla.ActorBlueprint): Vehicle blueprint.
+            spawn_point (carla.Transform): Spawn point for the vehicle.
+            is_hero (bool, optional): Whether the vehicle is a hero vehicle. Defaults to False.
+
+        Returns:
+            carla.Actor: Spawned vehicle actor.
+        """
         if blueprint.has_attribute('color'):
             color = random.choice(blueprint.get_attribute('color').recommended_values)
             blueprint.set_attribute('color', color)
@@ -75,6 +116,15 @@ class SpawnManager:
         return vehicle
 
     def spawn_hero(self, filter: str = "vehicle.tesla.model3"):
+        """
+        Spawn the hero vehicle.
+
+        Args:
+            filter (str, optional): Filter for the hero vehicle blueprint. Defaults to "vehicle.tesla.model3".
+
+        Returns:
+            carla.Actor: Spawned hero vehicle actor.
+        """
         if self.hero is not None:
             raise RuntimeError("Hero has been spawned already")
         vehicles = self.spawn_vehicles(1, filter, is_hero=True)
@@ -84,6 +134,17 @@ class SpawnManager:
         return self.hero
 
     def spawn_vehicles(self, number_of_vehicles: int, filter: str = "vehicle.*", is_hero: bool = False):
+        """
+        Spawn multiple vehicles in the simulation.
+
+        Args:
+            number_of_vehicles (int): Number of vehicles to spawn.
+            filter (str, optional): Filter for the vehicle blueprints. Defaults to "vehicle.*".
+            is_hero (bool, optional): Whether the vehicles are hero vehicles. Defaults to False.
+
+        Returns:
+            list[carla.Actor]: List of spawned vehicle actors.
+        """
         spawn_points = self.world.get_map().get_spawn_points()
         random.shuffle(spawn_points)
 
@@ -105,6 +166,16 @@ class SpawnManager:
         return vehicles
 
     def spawn_pedestrian(self, blueprint: carla.ActorBlueprint, spawn_point: carla.Transform):
+        """
+        Spawn a pedestrian in the simulation.
+
+        Args:
+            blueprint (carla.ActorBlueprint): Pedestrian blueprint.
+            spawn_point (carla.Transform): Spawn point for the pedestrian.
+
+        Returns:
+            tuple[carla.Actor, carla.Actor]: Spawned pedestrian actor and controller.
+        """
         pedestrian = self.world.try_spawn_actor(blueprint, spawn_point)
         if not pedestrian:
             return None, None
@@ -120,6 +191,15 @@ class SpawnManager:
         return pedestrian, controller
 
     def spawn_pedestrians(self, num_pedestrians: int):
+        """
+        Spawn multiple pedestrians in the simulation.
+
+        Args:
+            num_pedestrians (int): Number of pedestrians to spawn.
+
+        Returns:
+            tuple[list[carla.Actor], list[carla.Actor]]: List of spawned pedestrians and controllers.
+        """
         pedestrians = []
         pedestrian_controllers = []
 
@@ -158,6 +238,7 @@ class SpawnManager:
         return pedestrians, pedestrian_controllers
 
     def destroy(self):
+        """Destroy all spawned actors and shut down the traffic manager."""
         for vehicle in self.vehicles:
             if vehicle.is_alive:
                 vehicle.destroy()

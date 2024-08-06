@@ -1,10 +1,21 @@
 import numpy as np
 
 class Transformation:
-
+    """
+    Class for transformation operations.
+    """
     @staticmethod
     def transform_with_matrix(points: np.ndarray, matrix: np.ndarray) -> np.ndarray:
-        """Calculate 3d transformation"""
+        """
+        Calculate 3D transformation.
+
+        Args:
+            points (np.ndarray): Points to transform.
+            matrix (np.ndarray): Transformation matrix.
+
+        Returns:
+            np.ndarray: Transformed points.
+        """
         # Store original shape
         original_shape = points.shape
         

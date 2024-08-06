@@ -4,7 +4,17 @@ from easycarla.labels.label_types import ObjectType
 
 @dataclass
 class LabelData:
-    """All attributes of shape (N, ...) containing all labels"""
+    """
+    Class to store label data for objects.
+
+    Attributes:
+        id (np.ndarray): Array of object IDs.
+        transform (np.ndarray): Array of 4x4 transformation matrices.
+        dimension (np.ndarray): Array of object dimensions.
+        types (list[set[ObjectType]]): List of object types.
+        truncation (np.ndarray, optional): Array of truncation values.
+        occlusion (np.ndarray, optional): Array of occlusion values.
+    """
     id: np.ndarray
     transform: np.ndarray  # 4x4 transformation matrices
     dimension: np.ndarray
@@ -46,15 +56,17 @@ class LabelData:
 
     @property
     def position(self) -> np.ndarray:
+        """Get the position of objects."""
         return self.transform[:, :3, 3]
 
     @property
     def rotation_matrix(self) -> np.ndarray:
+        """Get the rotation matrix of objects."""
         return self.transform[:, :3, :3]
 
     @property
     def vertices(self) -> np.ndarray:
-        # Add extra verts on diagonals
+        """Get the vertices of the bounding boxes."""
         unit_box = self.UNIT_BOX
         extra_verts = []
         lines = self.DIAG_INDICES
@@ -78,14 +90,25 @@ class LabelData:
 
     @property
     def edges(self) -> np.ndarray:
+        """Get the edges of the bounding boxes."""
         vertices = self.vertices
         edges = vertices[:, self.EDGE_INDICES]
         return edges
     
     def __len__(self) -> int:
+        """Get the number of labels."""
         return len(self.transform)
 
     def __add__(self, other: 'LabelData') -> 'LabelData':
+        """
+        Add two LabelData objects.
+
+        Args:
+            other (LabelData): The other LabelData object.
+
+        Returns:
+            LabelData: Combined LabelData object.
+        """
         if not isinstance(other, LabelData):
             return NotImplemented
 
@@ -99,6 +122,15 @@ class LabelData:
         )
 
     def filter(self, mask: np.ndarray) -> 'LabelData':
+        """
+        Filter the labels based on a mask.
+
+        Args:
+            mask (np.ndarray): Boolean mask.
+
+        Returns:
+            LabelData: Filtered LabelData object.
+        """
         return LabelData(
             id=self.id[mask],
             transform=self.transform[mask],
@@ -109,6 +141,16 @@ class LabelData:
         )
 
     def filter_by_distance(self, distance: float, target: np.ndarray = None) -> 'LabelData':
+        """
+        Filter the labels by distance from a target point.
+
+        Args:
+            distance (float): Maximum distance.
+            target (np.ndarray, optional): Target point. Defaults to None.
+
+        Returns:
+            LabelData: Filtered LabelData object.
+        """
         target = target if target is not None else np.zeros(3)
         delta_pos = self.position - target
         sq_dist = np.sum(delta_pos**2, axis=1)
@@ -116,6 +158,17 @@ class LabelData:
         return self.filter(mask)
     
     def filter_by_direction(self, dot_threshold: float = 0.0, target: np.ndarray = None, forward: np.ndarray = None) -> 'LabelData':
+        """
+        Filter the labels by direction relative to a target point.
+
+        Args:
+            dot_threshold (float, optional): Dot product threshold. Defaults to 0.0.
+            target (np.ndarray, optional): Target point. Defaults to None.
+            forward (np.ndarray, optional): Forward direction. Defaults to None.
+
+        Returns:
+            LabelData: Filtered LabelData object.
+        """
         target = target if target is not None else np.zeros(3)
         forward = forward if forward is not None else np.array([1, 0, 0])
         delta_pos = self.position - target
@@ -124,14 +177,42 @@ class LabelData:
         return self.filter(mask)
     
     def filter_by_id(self, ids: np.ndarray) -> 'LabelData':
+        """
+        Filter the labels by IDs.
+
+        Args:
+            ids (np.ndarray): Array of IDs.
+
+        Returns:
+            LabelData: Filtered LabelData object.
+        """
         mask = np.isin(self.id, ids)
         return self.filter(mask)
 
     def apply_transform(self, matrix: np.ndarray) -> 'LabelData':
+        """
+        Apply a transformation matrix to the labels.
+
+        Args:
+            matrix (np.ndarray): Transformation matrix.
+
+        Returns:
+            LabelData: Transformed LabelData object.
+        """
         new_transform = np.einsum('ij,njk->nik', matrix, self.transform)
         return replace(self, transform=new_transform)
 
     def get_alpha(self, target: np.ndarray = None, forward: np.ndarray = None) -> np.ndarray:
+        """
+        Calculate alpha values for the labels.
+
+         Args:
+            target (np.ndarray, optional): Target point. Defaults to None.
+            forward (np.ndarray, optional): Forward direction. Defaults to None.
+
+        Returns:
+            np.ndarray: Alpha values.
+        """ 
         target = target if target is not None else np.zeros(3)
         forward = forward if forward is not None else np.array([1, 0, 0])
 

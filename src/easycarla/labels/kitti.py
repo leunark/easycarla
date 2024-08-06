@@ -132,6 +132,10 @@ class KITTIDatasetGenerator:
         Args:
             labels (LabelData): Label data object.
         """
+        # Make sure not to create a file if there are no labels
+        if len(labels) == 0:
+            logging.debug(f"No labels in frame {self.frame_id}")
+            return
         label_path = self.label_dir / f'{self.frame_id:06}.txt'
         with label_path.open('w') as f:
             for i in range(len(labels.id)):

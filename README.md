@@ -1,6 +1,12 @@
 # easycarla
 
-This project uses the Carla simulator to generate training data for autonomous driving models. Carla provides a flexible and scalable platform for generating a wide range of driving scenarios and capturing various sensor data. It consists out of multiple modules that can be uused even independently for other use cases. All code was vectorized for better performance.
+This project uses the **Carla** simulator to generate training data for autonomous driving models.\
+It consists out of multiple modules that can be used even independently for other use cases. All code was vectorized for better performance.\
+The resulting output is a **Kitti Dataset**. 
+
+## Showcase
+
+![Showcase](docs/showcase.gif)
 
 ## Table of Contents
 
@@ -63,7 +69,7 @@ Ensure your system meets the following requirements:
     ```shell
     python src/easycarla/main.py
     ```
-    or simply run `easycarla` with optional command line arguments.
+    or simply run `easycarla` with optional command line arguments (s. `examples/run.cmd`).
 
 
 
